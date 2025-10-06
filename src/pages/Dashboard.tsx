@@ -1,0 +1,268 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { getSales, getProducts, getClients } from '@/lib/storage';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Package, Users, TrendingUp, FileText, LogOut, Wine } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
+const Dashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalSales: 0,
+    totalProducts: 0,
+    totalClients: 0,
+    topProducts: [] as { name: string; sales: number }[],
+    recentSales: [] as any[],
+  });
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    // Calculate statistics
+    const sales = getSales();
+    const products = getProducts();
+    const clients = getClients();
+
+    const totalRevenue = sales.reduce((sum, sale) => sum + sale.totalPrice, 0);
+    
+    // Calculate top products
+    const productSales = new Map<string, number>();
+    sales.forEach(sale => {
+      const current = productSales.get(sale.productId) || 0;
+      productSales.set(sale.productId, current + sale.quantity);
+    });
+
+    const topProducts = Array.from(productSales.entries())
+      .map(([productId, quantity]) => {
+        const product = products.find(p => p.id === productId);
+        return {
+          name: product?.name || 'Unknown',
+          sales: quantity,
+        };
+      })
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5);
+
+    // Recent sales
+    const recentSales = sales
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5)
+      .map(sale => {
+        const product = products.find(p => p.id === sale.productId);
+        const client = clients.find(c => c.id === sale.clientId);
+        return {
+          ...sale,
+          productName: product?.name || 'N/A',
+          clientName: client?.name || 'N/A',
+        };
+      });
+
+    setStats({
+      totalRevenue,
+      totalSales: sales.length,
+      totalProducts: products.length,
+      totalClients: clients.length,
+      topProducts,
+      recentSales,
+    });
+  }, [user, navigate]);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', '#8884d8', '#82ca9d'];
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="bg-primary text-primary-foreground shadow-lg">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Wine className="w-8 h-8" />
+            <div>
+              <h1 className="text-2xl font-bold">Cave Premium Wines</h1>
+              <p className="text-sm opacity-90">Système de gestion</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="font-semibold">{user?.username}</p>
+              <p className="text-xs opacity-90">{user?.role === 'admin' ? 'Administrateur' : 'Commercial'}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleLogout} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+              <LogOut className="w-4 h-4 mr-2" />
+              Déconnexion
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Chiffre d'affaires</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalRevenue.toLocaleString('fr-FR')} FCFA</div>
+              <p className="text-xs text-muted-foreground">Total des ventes</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Ventes</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalSales}</div>
+              <p className="text-xs text-muted-foreground">Factures générées</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Produits</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalProducts}</div>
+              <p className="text-xs text-muted-foreground">En stock</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Clients</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalClients}</div>
+              <p className="text-xs text-muted-foreground">Actifs</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Button onClick={() => navigate('/products')} className="h-20 text-lg">
+            <Package className="w-5 h-5 mr-2" />
+            Produits
+          </Button>
+          <Button onClick={() => navigate('/clients')} className="h-20 text-lg">
+            <Users className="w-5 h-5 mr-2" />
+            Clients
+          </Button>
+          <Button onClick={() => navigate('/sales')} className="h-20 text-lg">
+            <TrendingUp className="w-5 h-5 mr-2" />
+            Ventes
+          </Button>
+          <Button onClick={() => navigate('/invoices')} className="h-20 text-lg">
+            <FileText className="w-5 h-5 mr-2" />
+            Factures
+          </Button>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Produits les plus vendus</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats.topProducts.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={stats.topProducts}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="sales" fill="hsl(var(--primary))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-center text-muted-foreground py-12">Aucune donnée disponible</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Répartition des ventes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats.topProducts.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={stats.topProducts}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={(entry: any) => `${entry.name} ${(entry.percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="sales"
+                    >
+                      {stats.topProducts.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-center text-muted-foreground py-12">Aucune donnée disponible</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Sales */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Ventes récentes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.recentSales.length > 0 ? (
+              <div className="space-y-4">
+                {stats.recentSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between border-b pb-4">
+                    <div>
+                      <p className="font-medium">{sale.productName}</p>
+                      <p className="text-sm text-muted-foreground">{sale.clientName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{sale.totalPrice.toLocaleString('fr-FR')} FCFA</p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(sale.date), 'dd MMM yyyy', { locale: fr })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">Aucune vente enregistrée</p>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+    </div>
+  );
+};
+
+export default Dashboard;
