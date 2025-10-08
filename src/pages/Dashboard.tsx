@@ -7,6 +7,7 @@ import { getSales, getProducts, getClients } from '@/lib/storage';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Package, Users, TrendingUp, FileText, LogOut, Wine } from 'lucide-react';
 import { format } from 'date-fns';
+import PageContainer from '@/components/PageContainer';
 import { fr } from 'date-fns/locale';
 
 const Dashboard = () => {
@@ -18,7 +19,7 @@ const Dashboard = () => {
     totalProducts: 0,
     totalClients: 0,
     topProducts: [] as { name: string; sales: number }[],
-    recentSales: [] as any[],
+  recentSales: [] as { id: string; date: string; totalPrice: number; productName: string; clientName: string }[],
   });
 
   useEffect(() => {
@@ -85,9 +86,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-primary text-primary-foreground shadow-lg">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="bg-primary text-primary-foreground shadow-lg">
+        <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <Wine className="w-8 h-8" />
             <div>
@@ -95,21 +95,21 @@ const Dashboard = () => {
               <p className="text-sm opacity-90">Système de gestion</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="font-semibold">{user?.username}</p>
-              <p className="text-xs opacity-90">{user?.role === 'admin' ? 'Administrateur' : 'Commercial'}</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={handleLogout} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-              <LogOut className="w-4 h-4 mr-2" />
-              Déconnexion
-            </Button>
-          </div>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <PageContainer>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">{user?.username}</p>
+            <p className="text-xs opacity-90">{user?.role === 'admin' ? 'Administrateur' : 'Commercial'}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleLogout} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+            <LogOut className="w-4 h-4 mr-2" />
+            Déconnexion
+          </Button>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -213,7 +213,10 @@ const Dashboard = () => {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={(entry: any) => `${entry.name} ${(entry.percent * 100).toFixed(0)}%`}
+                      label={(entry: unknown) => {
+                        const e = entry as { name?: string; percent?: number };
+                        return `${e.name || ''} ${((e.percent || 0) * 100).toFixed(0)}%`;
+                      }}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="sales"
@@ -260,7 +263,7 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-      </main>
+      </PageContainer>
     </div>
   );
 };

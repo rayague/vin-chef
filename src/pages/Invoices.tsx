@@ -1,0 +1,238 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import db from '@/lib/db';
+import { Invoice } from '@/lib/storage';
+import { generateInvoicePDF, downloadInvoice } from '@/lib/pdf';
+import { ArrowLeft, FileText, Eye, Download } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import PageContainer from '@/components/PageContainer';
+import PageHeader from '@/components/PageHeader';
+
+const Invoices = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [search, setSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [gotoPageInput, setGotoPageInput] = useState('');
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    (async () => {
+      const list = await db.getInvoices();
+      setInvoices(list as Invoice[]);
+    })();
+  }, [user, navigate]);
+
+  // Derived filtered + paginated data
+  const filtered = invoices.filter(inv => {
+    // Date filter
+    const invDate = new Date(inv.date);
+    if (fromDate) {
+      const f = new Date(fromDate + 'T00:00:00');
+      if (invDate < f) return false;
+    }
+    if (toDate) {
+      const t = new Date(toDate + 'T23:59:59');
+      if (invDate > t) return false;
+    }
+
+    // Text search over invoiceNumber, clientName, productName
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      inv.invoiceNumber.toLowerCase().includes(q) ||
+      inv.clientName.toLowerCase().includes(q) ||
+      inv.productName.toLowerCase().includes(q)
+    );
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handlePreview = (invoice: Invoice) => {
+    const doc = generateInvoicePDF({
+      invoiceNumber: invoice.invoiceNumber,
+      date: invoice.date,
+      clientName: invoice.clientName,
+      clientAddress: invoice.clientName,
+      clientPhone: '',
+      productName: invoice.productName,
+      quantity: invoice.quantity,
+      unitPrice: invoice.unitPrice,
+      totalHT: Math.round((invoice.totalPrice / 1.18) - invoice.tva),
+      tva: invoice.tva,
+      totalTTC: invoice.totalPrice,
+    });
+  // Open PDF in new tab
+  const url = (doc as unknown as { output: (format: string) => string }).output('bloburl');
+  window.open(url, '_blank');
+  };
+
+  const handleDownload = (invoice: Invoice) => {
+    const doc = generateInvoicePDF({
+      invoiceNumber: invoice.invoiceNumber,
+      date: invoice.date,
+      clientName: invoice.clientName,
+      clientAddress: invoice.clientName,
+      clientPhone: '',
+      productName: invoice.productName,
+      quantity: invoice.quantity,
+      unitPrice: invoice.unitPrice,
+      totalHT: Math.round((invoice.totalPrice / 1.18) - invoice.tva),
+      tva: invoice.tva,
+      totalTTC: invoice.totalPrice,
+    });
+    downloadInvoice(invoice.invoiceNumber, doc);
+  };
+
+  return (
+    <PageContainer>
+      <PageHeader title="Factures" subtitle="Liste des factures et téléchargements" actions={
+        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+      } />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Liste des Factures</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div>
+              <Label htmlFor="searchInput">Recherche</Label>
+              <Input id="searchInput" placeholder="N° facture, client, produit" aria-label="Recherche des factures" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
+            </div>
+
+            <div className="flex gap-2" role="group" aria-labelledby="date-filter-label">
+              <div>
+                <Label htmlFor="fromDate">Du</Label>
+                <Input id="fromDate" type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} />
+              </div>
+              <div>
+                <Label htmlFor="toDate">Au</Label>
+                <Input id="toDate" type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} />
+              </div>
+            </div>
+
+            <div className="flex justify-end items-center gap-2">
+              <Label htmlFor="pageSizeSelect">Par page</Label>
+              <select id="pageSizeSelect" aria-label="Nombre de factures par page" value={pageSize} onChange={(e) => { setPageSize(parseInt(e.target.value)); setPage(1); }} className="rounded border px-2 py-1">
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+              </select>
+            </div>
+          </div>
+          {invoices.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>N° Facture</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Montant</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody role="rowgroup">
+                    {paged.map((inv) => (
+                      <TableRow key={inv.id}>
+                        <TableCell className="font-mono">{inv.invoiceNumber}</TableCell>
+                        <TableCell>{format(new Date(inv.date), 'dd/MM/yyyy', { locale: fr })}</TableCell>
+                        <TableCell>{inv.clientName}</TableCell>
+                        <TableCell className="font-semibold">{inv.totalPrice.toLocaleString('fr-FR')} FCFA</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button size="sm" variant="ghost" onClick={() => handlePreview(inv)} aria-label={`Prévisualiser la facture ${inv.invoiceNumber}`}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleDownload(inv)} aria-label={`Télécharger la facture ${inv.invoiceNumber}`}>
+                              <Download className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="text-center py-12 text-muted-foreground">Aucune facture disponible</p>
+            )}
+          {/* Pagination */}
+          <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div id="invoices-summary" className="text-sm text-muted-foreground" aria-live="polite">Affichage {filtered.length === 0 ? 0 : ((currentPage - 1) * pageSize) + 1} - {Math.min(currentPage * pageSize, filtered.length)} sur {filtered.length}</div>
+
+            <div className="flex items-center gap-2" role="navigation" aria-label="Pagination des factures">
+              <div
+                className="inline-flex rounded-md overflow-hidden border bg-card"
+                aria-hidden={false}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                    e.preventDefault();
+                    setPage((p) => Math.max(1, p - 1));
+                  } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+                    e.preventDefault();
+                    setPage((p) => Math.min(totalPages, p + 1));
+                  }
+                }}
+              >
+                <Button size="sm" variant="outline" onClick={() => setPage(1)} disabled={currentPage === 1} aria-label="Aller au début" className="rounded-none first:rounded-l-md last:rounded-r-md px-3 py-1 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/60">« Début</Button>
+                <Button size="sm" variant="outline" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1} aria-label="Page précédente" className="rounded-none px-3 py-1 border-l focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/60">Précédent</Button>
+                <div className="px-4 py-1 flex items-center" aria-hidden>{currentPage} / {totalPages}</div>
+                <Button size="sm" variant="outline" onClick={() => setPage(currentPage + 1)} disabled={currentPage === totalPages} aria-label="Page suivante" className="rounded-none px-3 py-1 border-l focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/60">Suivant</Button>
+                <Button size="sm" variant="outline" onClick={() => setPage(totalPages)} disabled={currentPage === totalPages} aria-label="Aller à la fin" className="rounded-none border-l last:rounded-r-md px-3 py-1 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/60">Fin »</Button>
+              </div>
+              {/* Go-to-page control */}
+              <div className="ml-2 flex items-center gap-2">
+                <label htmlFor="gotoPage" className="sr-only">Aller à la page</label>
+                <input
+                  id="gotoPage"
+                  aria-label="Aller à la page"
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={gotoPageInput}
+                  onChange={(e) => setGotoPageInput(e.target.value)}
+                  className="w-20 rounded border px-2 py-1 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const v = Math.max(1, Math.min(totalPages, Number(gotoPageInput || 1)));
+                      setPage(v);
+                      setGotoPageInput('');
+                    }
+                  }}
+                />
+                <Button size="sm" variant="ghost" onClick={() => {
+                  const v = Math.max(1, Math.min(totalPages, Number(gotoPageInput || 1)));
+                  setPage(v);
+                  setGotoPageInput('');
+                }}>Aller</Button>
+              </div>
+            </div>
+          </div>
+          </CardContent>
+        </Card>
+    </PageContainer>
+  );
+};
+
+export default Invoices;

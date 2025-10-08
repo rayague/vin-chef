@@ -7,9 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Product, getProducts, addProduct, updateProduct, deleteProduct } from '@/lib/storage';
+import { Product } from '@/lib/storage';
+import db from '@/lib/db';
 import { Plus, Edit, Trash2, ArrowLeft, Package } from 'lucide-react';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import PageContainer from '@/components/PageContainer';
+import PageHeader from '@/components/PageHeader';
 
 const Products = () => {
   const { user } = useAuth();
@@ -27,6 +31,7 @@ const Products = () => {
     stockQuantity: '',
     description: '',
   });
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -34,13 +39,23 @@ const Products = () => {
       return;
     }
     loadProducts();
+    (async () => {
+      try {
+        const cats = await db.getCategories();
+        const typed = cats as Array<{ id: string; name: string }> | undefined;
+        setCategories((typed || []).map(c => ({ id: c.id, name: c.name })));
+      } catch (err) {
+        // ignore
+      }
+    })();
   }, [user, navigate]);
 
-  const loadProducts = () => {
-    setProducts(getProducts());
+  const loadProducts = async () => {
+    const list = await db.getProducts();
+    setProducts(list as Product[]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.category || !formData.unitPrice || !formData.stockQuantity) {
@@ -62,17 +77,11 @@ const Products = () => {
     };
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, productData);
-      toast({
-        title: 'Succès',
-        description: 'Produit mis à jour avec succès',
-      });
+      await db.updateProduct(editingProduct.id, productData);
+      toast({ title: 'Succès', description: 'Produit mis à jour avec succès' });
     } else {
-      addProduct(productData);
-      toast({
-        title: 'Succès',
-        description: 'Produit ajouté avec succès',
-      });
+      await db.addProduct(productData);
+      toast({ title: 'Succès', description: 'Produit ajouté avec succès' });
     }
 
     setIsDialogOpen(false);
@@ -93,13 +102,10 @@ const Products = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
-      deleteProduct(id);
-      toast({
-        title: 'Succès',
-        description: 'Produit supprimé avec succès',
-      });
+      await db.deleteProduct(id);
+      toast({ title: 'Succès', description: 'Produit supprimé avec succès' });
       loadProducts();
     }
   };
@@ -126,25 +132,18 @@ const Products = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-primary text-primary-foreground shadow-lg">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-primary-foreground hover:bg-primary-foreground/10">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <Package className="w-6 h-6" />
-            <h1 className="text-2xl font-bold">Gestion des Produits</h1>
-          </div>
-        </div>
-      </header>
+    <PageContainer>
+      <PageHeader title="Gestion des Produits" subtitle="Liste et gestion des articles" actions={
+        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+      } />
 
-      <main className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CardTitle>Liste des Produits</CardTitle>
-              <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <CardTitle>Liste des Produits</CardTitle>
+            <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
                 <Input
                   placeholder="Rechercher un produit..."
                   value={searchTerm}
@@ -175,12 +174,19 @@ const Products = () => {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="category">Catégorie *</Label>
-                          <Input
-                            id="category"
-                            value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                            placeholder="Bordeaux Rouge"
-                          />
+                          <Select value={formData.category} onValueChange={(val) => setFormData({ ...formData, category: val })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner une catégorie" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.length === 0 && (
+                                <SelectItem value="">Aucune catégorie</SelectItem>
+                              )}
+                              {categories.map(cat => (
+                                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="unitPrice">Prix unitaire (FCFA) *</Label>
@@ -277,8 +283,7 @@ const Products = () => {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+    </PageContainer>
   );
 };
 

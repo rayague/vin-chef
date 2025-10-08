@@ -56,6 +56,7 @@ const STORAGE_KEYS = {
   CLIENTS: 'winecellar_clients',
   SALES: 'winecellar_sales',
   INVOICES: 'winecellar_invoices',
+  CATEGORIES: 'winecellar_categories',
   CURRENT_USER: 'winecellar_current_user',
   INVOICE_COUNTER: 'winecellar_invoice_counter',
 };
@@ -103,9 +104,11 @@ export const storage = {
 
 // Users
 export const getUsers = () => storage.get<User>(STORAGE_KEYS.USERS);
-export const addUser = (user: User) => storage.add(STORAGE_KEYS.USERS, user);
+export const addUser = (user: User | Partial<User>) => storage.add(STORAGE_KEYS.USERS, user as User);
 export const getUserByUsername = (username: string) => 
   getUsers().find(u => u.username === username);
+export const updateUser = (id: string, updates: Partial<User | { passwordHash?: string }>) => storage.update<User>(STORAGE_KEYS.USERS, id, updates as Partial<User>);
+export const deleteUser = (id: string) => storage.delete<User>(STORAGE_KEYS.USERS, id);
 
 // Products
 export const getProducts = () => storage.get<Product>(STORAGE_KEYS.PRODUCTS);
@@ -113,6 +116,17 @@ export const addProduct = (product: Product) => storage.add(STORAGE_KEYS.PRODUCT
 export const updateProduct = (id: string, updates: Partial<Product>) => 
   storage.update<Product>(STORAGE_KEYS.PRODUCTS, id, updates);
 export const deleteProduct = (id: string) => storage.delete(STORAGE_KEYS.PRODUCTS, id);
+
+// Categories
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+}
+export const getCategories = () => storage.get<Category>(STORAGE_KEYS.CATEGORIES);
+export const addCategory = (category: Category) => storage.add(STORAGE_KEYS.CATEGORIES, category);
+export const updateCategory = (id: string, updates: Partial<Category>) => storage.update<Category>(STORAGE_KEYS.CATEGORIES, id, updates);
+export const deleteCategory = (id: string) => storage.delete(STORAGE_KEYS.CATEGORIES, id);
 
 // Clients
 export const getClients = () => storage.get<Client>(STORAGE_KEYS.CLIENTS);
@@ -156,22 +170,25 @@ export const getNextInvoiceNumber = (): string => {
 };
 
 // Initialize with demo data
-export const initializeDemoData = () => {
-  // Check if data already exists
-  if (getUsers().length > 0) return;
+import bcrypt from 'bcryptjs';
 
-  // Demo users (password: "admin123" and "demo123")
+export const initializeDemoData = (force: boolean = false) => {
+  // Check if data already exists
+  if (!force && getUsers().length > 0) return;
+
+  // Demo users (passwords: "admin123" and "demo123")
+  // Compute bcrypt hashes at runtime to ensure compatibility with bcryptjs in the browser and Electron.
   const demoUsers: User[] = [
     {
       id: '1',
       username: 'admin',
-      passwordHash: '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', // admin123
+      passwordHash: bcrypt.hashSync('admin123', 10),
       role: 'admin',
     },
     {
       id: '2',
       username: 'commercial',
-      passwordHash: '$2a$10$5fHq7AximXUGbpH0N0R7fOSH8kZE5h0iZnYPm7xqYrF3i5KfJPSVe', // demo123
+      passwordHash: bcrypt.hashSync('demo123', 10),
       role: 'commercial',
     },
   ];
@@ -231,3 +248,34 @@ export const initializeDemoData = () => {
   storage.set(STORAGE_KEYS.SALES, []);
   storage.set(STORAGE_KEYS.INVOICES, []);
 };
+
+// --- Audit helpers for browser fallback ---
+export interface AuditEntry {
+  id: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  userId?: string;
+  meta?: unknown;
+  date: string;
+}
+
+const AUDIT_KEY = 'winecellar_audits';
+
+export const addAudit = (entry: Partial<AuditEntry>) => {
+  const audits = storage.get<AuditEntry>(AUDIT_KEY);
+  const e: AuditEntry = {
+    id: entry.id || String(Date.now()) + Math.random().toString(36).slice(2, 8),
+    action: entry.action || 'unknown',
+    entity: entry.entity || 'unknown',
+    entityId: entry.entityId,
+    userId: entry.userId,
+    meta: entry.meta,
+    date: new Date().toISOString(),
+  };
+  audits.push(e);
+  storage.set(AUDIT_KEY, audits);
+  return e;
+};
+
+export const listAudits = (): AuditEntry[] => storage.get<AuditEntry>(AUDIT_KEY);

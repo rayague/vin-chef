@@ -7,13 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Sale, Product, Client, getProducts, getClients, getSales, addSale, updateProduct, addInvoice, getNextInvoiceNumber } from '@/lib/storage';
+import { Sale, Product, Client, Invoice } from '@/lib/storage';
+import db from '@/lib/db';
 import { generateInvoicePDF, downloadInvoice } from '@/lib/pdf';
 import { Plus, ArrowLeft, TrendingUp, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import PageContainer from '@/components/PageContainer';
+import PageHeader from '@/components/PageHeader';
 
 const Sales = () => {
   const { user } = useAuth();
@@ -23,6 +26,7 @@ const Sales = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     productId: '',
@@ -38,10 +42,11 @@ const Sales = () => {
     loadData();
   }, [user, navigate]);
 
-  const loadData = () => {
-    setSales(getSales());
-    setProducts(getProducts());
-    setClients(getClients());
+  const loadData = async () => {
+    const [s, p, c] = await Promise.all([db.getSales(), db.getProducts(), db.getClients()]);
+    setSales(s as Sale[]);
+    setProducts(p as Product[]);
+    setClients(c as Client[]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -63,7 +68,7 @@ const Sales = () => {
       return;
     }
 
-    const invoiceNumber = getNextInvoiceNumber();
+  const invoiceNumber = await db.getNextInvoiceNumber();
     const totalHT = product.unitPrice * quantity;
     const tva = totalHT * 0.18;
     const totalTTC = totalHT + tva;
@@ -79,21 +84,47 @@ const Sales = () => {
       invoiceNumber,
     };
 
-    addSale(saleData);
-    updateProduct(product.id, { stockQuantity: product.stockQuantity - quantity });
-    
-    addInvoice({
-      id: Date.now().toString(),
-      saleId: saleData.id,
-      invoiceNumber,
-      date: saleData.date,
-      clientName: client.name,
-      productName: product.name,
-      quantity,
-      unitPrice: product.unitPrice,
-      totalPrice: totalTTC,
-      tva,
-    });
+    setSaving(true);
+    try {
+      // Try atomic server-side operation when available (desktop)
+      if ((window as unknown as Window).electronAPI?.db && typeof (window as unknown as Window).electronAPI!.db!.createSaleWithInvoice === 'function') {
+        const invoicePayload: Record<string, unknown> = {
+          id: Date.now().toString(),
+          saleId: saleData.id,
+          invoiceNumber,
+          date: saleData.date,
+          clientSnapshot: JSON.stringify(client),
+          productSnapshot: JSON.stringify(product),
+          totalPrice: totalTTC,
+          tva,
+          ifu: undefined,
+          immutableFlag: 1,
+        };
+        await db.createSaleWithInvoice(saleData, invoicePayload as unknown as Invoice);
+      } else {
+        await db.addSale(saleData);
+        await db.updateProduct(product.id, { stockQuantity: product.stockQuantity - quantity });
+        await db.addInvoice({
+          id: Date.now().toString(),
+          saleId: saleData.id,
+          invoiceNumber,
+          date: saleData.date,
+          clientName: client.name,
+          productName: product.name,
+          quantity,
+          unitPrice: product.unitPrice,
+          totalPrice: totalTTC,
+          tva,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to save sale/invoice', err);
+      toast({ title: 'Erreur', description: 'Échec lors de l\'enregistrement de la vente', variant: 'destructive' });
+      setSaving(false);
+      return;
+    } finally {
+      setSaving(false);
+    }
 
     const pdf = generateInvoicePDF({
       invoiceNumber,
@@ -111,7 +142,7 @@ const Sales = () => {
 
     downloadInvoice(invoiceNumber, pdf);
 
-    toast({ title: 'Succès', description: 'Vente enregistrée et facture générée' });
+  toast({ title: 'Succès', description: 'Vente enregistrée et facture générée' });
     setIsDialogOpen(false);
     resetForm();
     loadData();
@@ -122,25 +153,18 @@ const Sales = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-primary text-primary-foreground shadow-lg">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/dashboard')} className="text-primary-foreground hover:bg-primary-foreground/10">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <TrendingUp className="w-6 h-6" />
-            <h1 className="text-2xl font-bold">Gestion des Ventes</h1>
-          </div>
-        </div>
-      </header>
+    <PageContainer>
+      <PageHeader title="Gestion des Ventes" subtitle="Enregistrer et gérer les ventes" actions={
+        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+      } />
 
-      <main className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Liste des Ventes</CardTitle>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Liste des Ventes</CardTitle>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button onClick={resetForm}>
                     <Plus className="w-4 h-4 mr-2" />
@@ -228,8 +252,7 @@ const Sales = () => {
             )}
           </CardContent>
         </Card>
-      </main>
-    </div>
+      </PageContainer>
   );
 };
 
