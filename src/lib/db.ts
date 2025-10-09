@@ -239,7 +239,7 @@ export const db = {
       if (api && typeof api.addSale === 'function') {
         const res = await api.addSale(sale);
         try {
-          if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, undefined, { sale });
+          if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, (sale as unknown as StorageSale).createdBy || undefined, { sale });
         } catch (err) {
           console.error('Failed to write audit (addSale electron)', err);
         }
@@ -248,6 +248,26 @@ export const db = {
     }
     try {
       await idb.idbPut('sales', sale);
+      // ensure localStorage fallback is also updated (jsdom/node env may not expose IndexedDB reads)
+      try {
+        const s = await import('./storage');
+        if (typeof s.addSale === 'function') s.addSale(sale as unknown as import('./storage').Sale);
+        // Also decrement product stock in storage fallback so getProducts() sees the change
+        try {
+          if (typeof s.getProducts === 'function' && typeof s.updateProduct === 'function') {
+            const prods = s.getProducts();
+            const p = prods.find((x: unknown) => (x as import('./storage').Product).id === sale.productId) as import('./storage').Product | undefined;
+            if (p) {
+              const newQty = (p.stockQuantity ?? p.stock_quantity ?? 0) - sale.quantity;
+              s.updateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+      } catch (err) {
+        // ignore
+      }
       // decrement product stock in idb if present
       try {
         const prod = await idb.idbGet<StorageProduct>('products', sale.productId);
@@ -263,7 +283,7 @@ export const db = {
         // write audit in fallback storage if available
         try {
           const s = await import('./storage');
-          if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, meta: { sale } });
+          if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale } });
         } catch (err) {
           console.error('Failed to write audit (addSale fallback)', err);
         }
@@ -296,7 +316,7 @@ export const db = {
       if (api && typeof api.addInvoice === 'function') {
         const res = await api.addInvoice(invoice);
         try {
-          if (typeof api.addAudit === 'function') await api.addAudit('create', 'invoice', invoice.id, undefined, { invoice });
+          if (typeof api.addAudit === 'function') await api.addAudit('create', 'invoice', invoice.id, (invoice as unknown as StorageInvoice).createdBy || undefined, { invoice });
         } catch (err) {
           console.error('Failed to write audit (addInvoice electron)', err);
         }
@@ -305,9 +325,16 @@ export const db = {
     }
     try {
       await idb.idbPut('invoices', invoice);
+      // ensure localStorage fallback is also updated
       try {
         const s = await import('./storage');
-        if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'invoice', entityId: invoice.id, meta: { invoice } });
+  if (typeof s.addInvoice === 'function') s.addInvoice(invoice as unknown as import('./storage').Invoice);
+      } catch (err) {
+        // ignore
+      }
+      try {
+        const s = await import('./storage');
+  if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'invoice', entityId: invoice.id, userId: (invoice as unknown as StorageInvoice).createdBy, meta: { invoice } });
       } catch (err) {
         console.error('Failed to write audit (addInvoice fallback)', err);
       }
@@ -324,7 +351,7 @@ export const db = {
       if (api && typeof api.createSaleWithInvoice === 'function') {
         const res = await api.createSaleWithInvoice(sale, invoice);
         try {
-          if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, undefined, { sale, invoice });
+          if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, (sale as unknown as StorageSale).createdBy || undefined, { sale, invoice });
         } catch (err) {
           console.error('Failed to write audit (createSaleWithInvoice electron)', err);
         }
@@ -334,13 +361,15 @@ export const db = {
     // fallback: try sequential and hope for best
     const s = await this.addSale(sale);
     const inv = await this.addInvoice(invoice);
+  // fallback: sale/invoice were created sequentially
     try {
       // attempt to write a combined audit in fallback
       const st = await import('./storage');
-      if (typeof st.addAudit === 'function') st.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, meta: { sale, invoice } });
+  if (typeof st.addAudit === 'function') st.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale, invoice } });
     } catch (err) {
       console.error('Failed to write audit (createSaleWithInvoice fallback)', err);
     }
+    // storage state updated by fallback writes
     return { sale: s, invoice: inv };
   },
 

@@ -23,6 +23,7 @@ export interface Client {
   email?: string;
   phone?: string;
   address?: string;
+  ifu?: string;
 }
 
 export interface Sale {
@@ -34,6 +35,7 @@ export interface Sale {
   totalPrice: number;
   date: string;
   invoiceNumber: string;
+  createdBy?: string;
 }
 
 export interface Invoice {
@@ -42,11 +44,14 @@ export interface Invoice {
   invoiceNumber: string;
   date: string;
   clientName: string;
+  clientIFU?: string;
   productName: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
   tva: number;
+  tvaRate?: number;
+  createdBy?: string;
 }
 
 // Storage keys
@@ -76,10 +81,11 @@ export const storage = {
     localStorage.setItem(key, JSON.stringify(data));
   },
 
-  add: <T extends { id: string }>(key: string, item: T): void => {
+  add: <T extends { id: string }>(key: string, item: T): T => {
     const items = storage.get<T>(key);
     items.push(item);
     storage.set(key, items);
+    return item;
   },
 
   update: <T extends { id: string }>(key: string, id: string, updates: Partial<T>): void => {

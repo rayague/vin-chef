@@ -25,6 +25,7 @@ const Sales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -43,10 +44,11 @@ const Sales = () => {
   }, [user, navigate]);
 
   const loadData = async () => {
-    const [s, p, c] = await Promise.all([db.getSales(), db.getProducts(), db.getClients()]);
+    const [s, p, c, u] = await Promise.all([db.getSales(), db.getProducts(), db.getClients(), db.getUsers()]);
     setSales(s as Sale[]);
     setProducts(p as Product[]);
     setClients(c as Client[]);
+    setUsers((u as unknown as { id: string; username: string }[]) || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,6 +84,7 @@ const Sales = () => {
       totalPrice: totalTTC,
       date: new Date().toISOString(),
       invoiceNumber,
+      createdBy: user?.id,
     };
 
     setSaving(true);
@@ -97,8 +100,10 @@ const Sales = () => {
           productSnapshot: JSON.stringify(product),
           totalPrice: totalTTC,
           tva,
-          ifu: undefined,
+            ifu: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
+            tvaRate: 18,
           immutableFlag: 1,
+          createdBy: user?.id,
         };
         await db.createSaleWithInvoice(saleData, invoicePayload as unknown as Invoice);
       } else {
@@ -110,11 +115,14 @@ const Sales = () => {
           invoiceNumber,
           date: saleData.date,
           clientName: client.name,
+          clientIFU: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
           productName: product.name,
           quantity,
           unitPrice: product.unitPrice,
           totalPrice: totalTTC,
           tva,
+          tvaRate: 18,
+          createdBy: user?.id,
         });
       }
     } catch (err) {
@@ -234,6 +242,7 @@ const Sales = () => {
                   {sales.map(sale => {
                     const product = products.find(p => p.id === sale.productId);
                     const client = clients.find(c => c.id === sale.clientId);
+                    const operator = users.find(u => u.id === (sale as unknown as Sale).createdBy);
                     return (
                       <TableRow key={sale.id}>
                         <TableCell className="font-mono">{sale.invoiceNumber}</TableCell>
@@ -242,6 +251,7 @@ const Sales = () => {
                         <TableCell>{product?.name}</TableCell>
                         <TableCell>{sale.quantity}</TableCell>
                         <TableCell className="font-semibold">{sale.totalPrice.toLocaleString('fr-FR')} FCFA</TableCell>
+                        <TableCell>{operator ? operator.username : '-'}</TableCell>
                       </TableRow>
                     );
                   })}

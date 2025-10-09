@@ -185,16 +185,22 @@ function init(app) {
     getProducts: () => db.prepare('SELECT * FROM products').all(),
     addProduct: (product) => {
       const now = new Date().toISOString();
+      // Support both camelCase and snake_case incoming product shapes from tests or other callers
+      const unitPrice = product.unitPrice ?? product.unit_price;
+      const stockQuantity = product.stockQuantity ?? product.stock_quantity;
       db.prepare('INSERT INTO products (id, name, category, unit_price, stock_quantity, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(product.id, product.name, product.category || null, product.unitPrice, product.stockQuantity, product.description || null, now);
+        .run(product.id, product.name, product.category || null, unitPrice, stockQuantity, product.description || null, now);
       return db.prepare('SELECT * FROM products WHERE id = ?').get(product.id);
     },
     updateProduct: (id, updates) => {
       const existing = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
       if (!existing) return null;
       const updated = { ...existing, ...updates, updated_at: new Date().toISOString() };
+      // accept either naming style for unit price / stock quantity
+      const unitPrice = updated.unit_price ?? updated.unitPrice;
+      const stockQuantity = updated.stock_quantity ?? updated.stockQuantity;
       db.prepare('UPDATE products SET name = ?, category = ?, unit_price = ?, stock_quantity = ?, description = ?, updated_at = ? WHERE id = ?')
-        .run(updated.name, updated.category, updated.unit_price ?? updated.unitPrice, updated.stock_quantity ?? updated.stockQuantity, updated.description, updated.updated_at, id);
+        .run(updated.name, updated.category, unitPrice, stockQuantity, updated.description, updated.updated_at, id);
       return db.prepare('SELECT * FROM products WHERE id = ?').get(id);
     },
     deleteProduct: (id) => db.prepare('DELETE FROM products WHERE id = ?').run(id),
