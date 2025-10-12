@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Package, Users, TrendingUp, FileText, Home, LogOut, Layers } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -21,6 +23,7 @@ const Layout = () => {
   const navigate = useNavigate();
 
   const [collapsed, setCollapsed] = useState(false);
+  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const sidebarWidth = collapsed ? '5rem' : '16rem';
 
   if (import.meta.env.DEV) {
@@ -78,33 +81,58 @@ const Layout = () => {
                 <TooltipContent>Tableau de bord</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <SidebarItem collapsed={collapsed} to="/products" icon={<Package />} label="Produits" />
-            <SidebarItem collapsed={collapsed} to="/categories" icon={<Layers />} label="Catégories" />
-            <SidebarItem collapsed={collapsed} to="/sales" icon={<TrendingUp />} label="Ventes" />
-            <SidebarItem collapsed={collapsed} to="/reports" icon={<TrendingUp />} label="Rapports" />
-            {user?.role === 'admin' && (
+            {user?.role === 'commercial' ? (
               <>
-                <SidebarItem collapsed={collapsed} to="/backups" icon={<Layers />} label="Sauvegardes" />
-                <SidebarItem collapsed={collapsed} to="/audits" icon={<FileText />} label="Audit" />
-                <SidebarItem collapsed={collapsed} to="/clients" icon={<Users />} label="Utilisateurs" />
+                <SidebarItem collapsed={collapsed} to="/sales" icon={<TrendingUp />} label="Ventes" />
+                <SidebarItem collapsed={collapsed} to="/invoices" icon={<FileText />} label="Factures" />
+                {/* Allow commerciaux to access Clients page */}
+                <SidebarItem collapsed={collapsed} to="/customers" icon={<Users />} label="Clients" />
+              </>
+            ) : (
+              <>
+                <SidebarItem collapsed={collapsed} to="/products" icon={<Package />} label="Produits" />
+                <SidebarItem collapsed={collapsed} to="/categories" icon={<Layers />} label="Catégories" />
+                <SidebarItem collapsed={collapsed} to="/sales" icon={<TrendingUp />} label="Ventes" />
+                <SidebarItem collapsed={collapsed} to="/reports" icon={<TrendingUp />} label="Rapports" />
+                {user?.role === 'admin' && (
+                  <>
+                    {/* Backups and Audit temporarily hidden per request - uncomment to restore */}
+                    {/* <SidebarItem collapsed={collapsed} to="/backups" icon={<Layers />} label="Sauvegardes" /> */}
+                    {/* <SidebarItem collapsed={collapsed} to="/audits" icon={<FileText />} label="Audit" /> */}
+                    <SidebarItem collapsed={collapsed} to="/clients" icon={<Users />} label="Utilisateurs" />
+                  </>
+                )}
+                {/* Clients (customers) page - visible to commercial and admin roles */}
+                {(user?.role === 'admin' || user?.role === 'commercial') && (
+                  <SidebarItem collapsed={collapsed} to="/customers" icon={<Users />} label="Clients" />
+                )}
+                <SidebarItem collapsed={collapsed} to="/invoices" icon={<FileText />} label="Factures" />
               </>
             )}
-            <SidebarItem collapsed={collapsed} to="/invoices" icon={<FileText />} label="Factures" />
           </div>
         </nav>
 
         <div className="mt-auto p-4">
-          <button
-            onClick={() => {
-              if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
-                logout();
-              }
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-md bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Déconnexion</span>
-          </button>
+          <Dialog open={isLogoutOpen} onOpenChange={setIsLogoutOpen}>
+            <DialogTrigger asChild>
+              <button className="w-full flex items-center gap-3 px-4 py-3 rounded-md bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))]">
+                <LogOut className="w-4 h-4" />
+                <span>Déconnexion</span>
+              </button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmer la déconnexion</DialogTitle>
+              </DialogHeader>
+              <p>Voulez-vous vraiment vous déconnecter ?</p>
+              <DialogFooter>
+                <div className="flex gap-2 justify-end mt-4">
+                  <Button variant="outline" onClick={() => setIsLogoutOpen(false)}>Annuler</Button>
+                  <Button variant="destructive" onClick={() => { setIsLogoutOpen(false); logout(); }}>Déconnexion</Button>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </aside>
 

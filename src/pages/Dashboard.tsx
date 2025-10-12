@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { getSales, getProducts, getClients } from '@/lib/storage';
+import db from '@/lib/db';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Package, Users, TrendingUp, FileText, LogOut, Wine } from 'lucide-react';
 import { format } from 'date-fns';
@@ -28,19 +28,24 @@ const Dashboard = () => {
       return;
     }
 
-    // Calculate statistics
-    const sales = getSales();
-    const products = getProducts();
-    const clients = getClients();
+    // Calculate statistics using adapter (Electron / IndexedDB / storage)
+    (async () => {
+      const [sales, products, clients] = await Promise.all([db.getSales(), db.getProducts(), db.getClients()]);
 
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.totalPrice, 0);
+      // If non-admin, only consider their sales
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allSales = (sales as unknown as any[]) || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const visibleSales = user && user.role !== 'admin' ? allSales.filter(s => (s as any).createdBy === user.id) : allSales;
+
+      const totalRevenue = visibleSales.reduce((sum, sale) => sum + (sale.totalPrice || 0), 0);
     
     // Calculate top products
     const productSales = new Map<string, number>();
-    sales.forEach(sale => {
-      const current = productSales.get(sale.productId) || 0;
-      productSales.set(sale.productId, current + sale.quantity);
-    });
+      visibleSales.forEach(sale => {
+        const current = productSales.get(sale.productId) || 0;
+        productSales.set(sale.productId, current + sale.quantity);
+      });
 
     const topProducts = Array.from(productSales.entries())
       .map(([productId, quantity]) => {
@@ -54,27 +59,34 @@ const Dashboard = () => {
       .slice(0, 5);
 
     // Recent sales
-    const recentSales = sales
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5)
-      .map(sale => {
-        const product = products.find(p => p.id === sale.productId);
-        const client = clients.find(c => c.id === sale.clientId);
-        return {
-          ...sale,
-          productName: product?.name || 'N/A',
-          clientName: client?.name || 'N/A',
-        };
-      });
+      const recentSales = visibleSales
+        .slice()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .sort((a, b) => new Date((b as any).date).getTime() - new Date((a as any).date).getTime())
+        .slice(0, 5)
+        .map(sale => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const product = (products as any[]).find(p => p.id === (sale as any).productId);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const client = (clients as any[]).find(c => c.id === (sale as any).clientId);
+          return {
+            ...sale,
+            productName: product?.name || 'N/A',
+            clientName: client?.name || 'N/A',
+          };
+        });
 
-    setStats({
-      totalRevenue,
-      totalSales: sales.length,
-      totalProducts: products.length,
-      totalClients: clients.length,
-      topProducts,
-      recentSales,
-    });
+      setStats({
+        totalRevenue,
+        totalSales: visibleSales.length,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  totalProducts: (products as any[]).length,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  totalClients: (clients as any[]).length,
+        topProducts,
+        recentSales,
+      });
+    })();
   }, [user, navigate]);
 
   const handleLogout = () => {
@@ -158,7 +170,7 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Button onClick={() => navigate('/products')} className="h-20 text-lg">
             <Package className="w-5 h-5 mr-2" />
             Produits
@@ -175,7 +187,7 @@ const Dashboard = () => {
             <FileText className="w-5 h-5 mr-2" />
             Factures
           </Button>
-        </div>
+        </div> */}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

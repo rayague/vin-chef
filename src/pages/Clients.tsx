@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import db from '@/lib/db';
+import * as idb from '@/lib/indexeddb';
+import { getUsers as storageGetUsers } from '@/lib/storage';
 import { Plus, Edit, Trash2, ArrowLeft, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PageContainer from '@/components/PageContainer';
@@ -166,13 +168,39 @@ const UsersPage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-64"
                 />
+                {process.env.NODE_ENV === 'development' && (
+                  <Button variant="outline" onClick={async () => {
+                    try {
+                      const d = await db.getUsers();
+                      console.debug('db.getUsers()', d);
+                    } catch (err) {
+                      console.error('db.getUsers() error', err);
+                    }
+                    try {
+                      const id = await idb.idbGetAll('users');
+                      console.debug('idb.idbGetAll("users")', id);
+                    } catch (err) {
+                      console.error('idb.idbGetAll(users) error', err);
+                    }
+                    try {
+                      const s = storageGetUsers();
+                      console.debug('storage.getUsers()', s);
+                    } catch (err) {
+                      console.error('storage.getUsers() error', err);
+                    }
+                  }}>
+                    Debug users
+                  </Button>
+                )}
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button onClick={() => { resetForm(); setEditingUser(null); }}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Nouvel utilisateur
-                    </Button>
-                  </DialogTrigger>
+                  {user?.role === 'admin' ? (
+                    <DialogTrigger asChild>
+                      <Button onClick={() => { resetForm(); setEditingUser(null); }}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Nouvel utilisateur
+                      </Button>
+                    </DialogTrigger>
+                  ) : null}
                   <DialogContent className="max-w-md">
                     <DialogHeader>
                       <DialogTitle>{editingUser ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}</DialogTitle>

@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
 import Clients from "./pages/Clients"; // Users management (page file kept at pages/Clients.tsx)
+import Customers from './pages/Customers';
 import Sales from "./pages/Sales";
 import Invoices from "./pages/Invoices";
 import Categories from "./pages/Categories";
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/audits" element={<AuditLogs />} />
               </Route>
               <Route path="/sales" element={<Sales />} />
+              <Route path="/customers" element={<Customers />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/categories" element={<Categories />} />

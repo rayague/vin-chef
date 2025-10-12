@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,8 @@ const Sales = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
+  const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
+  const [clientForm, setClientForm] = useState({ firstName: '', lastName: '', phone: '' });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -35,21 +37,33 @@ const Sales = () => {
     quantity: '',
   });
 
+  const location = useLocation();
+
+  const loadData = useCallback(async () => {
+    const [s, p, c, u] = await Promise.all([db.getSales(), db.getProducts(), db.getClients(), db.getUsers()]);
+    const allSales = s as Sale[];
+    const visibleSales = (user && user.role !== 'admin') ? allSales.filter(sale => (sale as unknown as Sale).createdBy === user.id) : allSales;
+    setSales(visibleSales);
+    setProducts(p as Product[]);
+    setClients(c as Client[]);
+    setUsers((u as unknown as { id: string; username: string }[]) || []);
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
       return;
     }
     loadData();
-  }, [user, navigate]);
 
-  const loadData = async () => {
-    const [s, p, c, u] = await Promise.all([db.getSales(), db.getProducts(), db.getClients(), db.getUsers()]);
-    setSales(s as Sale[]);
-    setProducts(p as Product[]);
-    setClients(c as Client[]);
-    setUsers((u as unknown as { id: string; username: string }[]) || []);
-  };
+    // If navigated with a clientId in state, prefill and open the dialog
+    const state = (location && (location as unknown as { state?: { clientId?: string } }).state) || undefined;
+    const clientIdFromState = state?.clientId;
+    if (clientIdFromState) {
+      setFormData(prev => ({ ...prev, clientId: clientIdFromState }));
+      setIsDialogOpen(true);
+    }
+  }, [user, navigate, location, loadData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,17 +199,24 @@ const Sales = () => {
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Client *</Label>
-                      <Select value={formData.clientId} onValueChange={(value) => setFormData({ ...formData, clientId: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map(client => (
-                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <Label>Client *</Label>
+                            <Select value={formData.clientId} onValueChange={(value) => setFormData({ ...formData, clientId: value })}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner un client" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clients.map(client => (
+                                  <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="pt-6">
+                            <Button size="sm" variant="outline" onClick={() => setIsClientDialogOpen(true)}>Ajouter client</Button>
+                          </div>
+                        </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Produit *</Label>
@@ -223,6 +244,60 @@ const Sales = () => {
                   </form>
                 </DialogContent>
               </Dialog>
+                {/* Add client dialog */}
+                <Dialog open={isClientDialogOpen} onOpenChange={setIsClientDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Nouvel client</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      // No strict validation per request - just save the provided info
+                      const fullName = `${(clientForm.lastName || '').trim()} ${(clientForm.firstName || '').trim()}`.trim();
+                      const newClient: Client = {
+                        id: Date.now().toString(),
+                        name: fullName || 'Client',
+                        contactInfo: '',
+                        email: undefined,
+                        phone: clientForm.phone || undefined,
+                        address: undefined,
+                        ifu: undefined,
+                      };
+                      try {
+                        await db.addClient(newClient);
+                        const updated = await db.getClients();
+                        setClients(updated as Client[]);
+                        setFormData({ ...formData, clientId: newClient.id });
+                        toast({ title: 'Succès', description: 'Client ajouté' });
+                        setIsClientDialogOpen(false);
+                        setClientForm({ firstName: '', lastName: '', phone: '' });
+                      } catch (err) {
+                        console.error('Failed to add client', err);
+                        toast({ title: 'Erreur', description: 'Impossible d\'ajouter le client', variant: 'destructive' });
+                      }
+                    }} className="space-y-4">
+                      <p className="text-sm text-muted-foreground">Seuls nom, prénom et téléphone sont requis.</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
+                          <Label>Nom</Label>
+                          <Input value={clientForm.lastName} onChange={(e) => setClientForm({ ...clientForm, lastName: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Prénom</Label>
+                          <Input value={clientForm.firstName} onChange={(e) => setClientForm({ ...clientForm, firstName: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Téléphone</Label>
+                        <Input type="tel" placeholder="+229 97 00 00 00" value={clientForm.phone} onChange={(e) => setClientForm({ ...clientForm, phone: e.target.value })} />
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="outline" onClick={() => setIsClientDialogOpen(false)}>Annuler</Button>
+                        <Button type="submit">Ajouter</Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
             </div>
           </CardHeader>
           <CardContent>
@@ -236,6 +311,7 @@ const Sales = () => {
                     <TableHead>Produit</TableHead>
                     <TableHead>Quantité</TableHead>
                     <TableHead>Montant</TableHead>
+                    {user?.role === 'admin' && <TableHead>Opérateur</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -251,7 +327,9 @@ const Sales = () => {
                         <TableCell>{product?.name}</TableCell>
                         <TableCell>{sale.quantity}</TableCell>
                         <TableCell className="font-semibold">{sale.totalPrice.toLocaleString('fr-FR')} FCFA</TableCell>
-                        <TableCell>{operator ? operator.username : '-'}</TableCell>
+                        {user?.role === 'admin' && (
+                          <TableCell>{operator ? operator.username : '-'}</TableCell>
+                        )}
                       </TableRow>
                     );
                   })}

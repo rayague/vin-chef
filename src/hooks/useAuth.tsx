@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import bcrypt from 'bcryptjs';
-import { User, getCurrentUser, setCurrentUser, getUserByUsername, initializeDemoData } from '@/lib/storage';
+import { User, getCurrentUser, setCurrentUser, initializeDemoData } from '@/lib/storage';
+import db from '@/lib/db';
 
 interface AuthContextType {
   user: User | null;
@@ -48,14 +49,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Normal lookup
-      let foundUser = getUserByUsername(username);
+      // Use the adapter to look up the user. This ensures we consult Electron IPC or IndexedDB fallback.
+      let foundUser = await db.getUserByUsername(username);
 
       // If not found and we're in DEV, attempt to re-seed demo data once and retry (helps when dev server changed without restart)
       if (!foundUser && import.meta.env.DEV) {
         try {
-          console.debug('useAuth [DEV]: user not found, forcing demo seed and retrying');
+          console.debug('useAuth [DEV]: user not found via db, forcing demo seed and retrying');
+          // Prefer the db reset which handles IndexedDB + storage fallback
+          if (typeof db.resetDemoData === 'function') {
+            try { await db.resetDemoData(); } catch (e) { /* ignore */ }
+          }
           initializeDemoData(true);
-          foundUser = getUserByUsername(username);
+          foundUser = await db.getUserByUsername(username);
         } catch (err) {
           console.error('useAuth [DEV]: initializeDemoData failed', err);
         }
@@ -66,22 +72,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
 
+      // Normalize the returned user object (db adapter may return a lightweight UserInfo
+      // when running under Electron). We need a `passwordHash` to verify the password.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const foundUserAny = foundUser as any;
       // Developer-friendly debug: in dev show the stored hash and attempt compare so we can see why it fails
       if (import.meta.env.DEV) {
-        console.debug('useAuth [DEV]: foundUser', { username: foundUser.username, passwordHash: foundUser.passwordHash });
+        console.debug('useAuth [DEV]: foundUser', { username: foundUserAny?.username, passwordHash: foundUserAny?.passwordHash });
       }
 
       let isValid = false;
       try {
-        isValid = await bcrypt.compare(password, foundUser.passwordHash);
+        const hash = foundUserAny?.passwordHash;
+        if (hash) isValid = await bcrypt.compare(password, hash);
       } catch (err) {
         console.error('useAuth: bcrypt.compare threw', err);
       }
 
       console.debug('useAuth: bcrypt.compare result for', username, isValid);
       if (isValid) {
-        setUser(foundUser);
-        setCurrentUser(foundUser);
+        // Create a safe user object that matches the `User` shape expected by the app
+        const safeUser: User = { id: foundUserAny.id, username: foundUserAny.username, role: foundUserAny.role, passwordHash: foundUserAny.passwordHash || '' } as User;
+        setUser(safeUser);
+        setCurrentUser(safeUser);
         return true;
       }
 
@@ -90,13 +103,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
           console.debug('useAuth [DEV]: invalid password, forcing demo seed and retrying compare');
           initializeDemoData(true);
-          const retryUser = getUserByUsername(username);
+          const retryUser = await db.getUserByUsername(username);
           if (retryUser) {
-            const retryValid = await bcrypt.compare(password, retryUser.passwordHash);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const retryUserAny = retryUser as any;
+            const retryValid = retryUserAny?.passwordHash ? await bcrypt.compare(password, retryUserAny.passwordHash) : false;
             console.debug('useAuth [DEV]: retry bcrypt.compare result for', username, retryValid);
             if (retryValid) {
-              setUser(retryUser);
-              setCurrentUser(retryUser);
+              const safeRetry: User = { id: retryUserAny.id, username: retryUserAny.username, role: retryUserAny.role, passwordHash: retryUserAny.passwordHash || '' } as User;
+              setUser(safeRetry);
+              setCurrentUser(safeRetry);
               return true;
             }
           }

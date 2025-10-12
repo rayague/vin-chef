@@ -19,6 +19,7 @@ const Reports = () => {
   const [products, setProducts] = useState<ProductShape[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [productFilter, setProductFilter] = useState<string>('');
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -30,7 +31,11 @@ const Reports = () => {
   }, [user, navigate]);
 
   const filteredSales = useMemo(() => {
-    if (!startDate && !endDate) return sales;
+    let out = sales;
+    if (productFilter) {
+      out = out.filter(s => (s.product_id ?? s.productId ?? '') === productFilter);
+    }
+    if (!startDate && !endDate) return out;
     const s = startDate ? new Date(startDate) : null;
     const e = endDate ? new Date(endDate) : null;
     return sales.filter(sale => {
@@ -74,6 +79,10 @@ const Reports = () => {
       <div className="flex gap-2 items-center mb-4">
         <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        <select value={productFilter} onChange={(e) => setProductFilter(e.target.value)} className="border rounded px-2 py-1">
+          <option value="">-- Filtrer par produit --</option>
+          {products.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+        </select>
         <Button onClick={() => { setStartDate(''); setEndDate(''); }}>Réinitialiser</Button>
         <Button onClick={() => exportCsv(filteredSales)}>Exporter CSV</Button>
       </div>

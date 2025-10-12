@@ -179,12 +179,14 @@ const Products = () => {
                               <SelectValue placeholder="Sélectionner une catégorie" />
                             </SelectTrigger>
                             <SelectContent>
-                              {categories.length === 0 && (
-                                <SelectItem value="">Aucune catégorie</SelectItem>
-                              )}
-                              {categories.map(cat => (
-                                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                              ))}
+                                  {categories.length === 0 ? (
+                                    // Avoid empty string value: Radix Select requires non-empty values.
+                                    <SelectItem value="__none" disabled>Aucune catégorie</SelectItem>
+                                  ) : (
+                                    categories.map(cat => (
+                                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                                    ))
+                                  )}
                             </SelectContent>
                           </Select>
                         </div>

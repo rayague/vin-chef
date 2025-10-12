@@ -147,9 +147,13 @@ export const db = {
     }
     try {
       await idb.idbPut('categories', category);
+      console.debug('db.addCategory: wrote to idb', category);
       return category;
     } catch (e) {
-      return storageAddCategory(category);
+      console.error('db.addCategory: idb write failed, falling back to storageAddCategory', e);
+      const res = storageAddCategory(category);
+      console.debug('db.addCategory: storageAddCategory result', res);
+      return res;
     }
   },
 
@@ -258,7 +262,7 @@ export const db = {
             const prods = s.getProducts();
             const p = prods.find((x: unknown) => (x as import('./storage').Product).id === sale.productId) as import('./storage').Product | undefined;
             if (p) {
-              const newQty = (p.stockQuantity ?? p.stock_quantity ?? 0) - sale.quantity;
+              const newQty = (p.stockQuantity ?? 0) - sale.quantity;
               s.updateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
             }
           }
@@ -447,6 +451,7 @@ export const db = {
       const u: StorageUser = { id: user.id, username: user.username, passwordHash: bcrypt.hashSync(user.password || 'changeme', 10), role: user.role || 'commercial' };
       if (typeof s.addUser === 'function') {
         s.addUser(u as unknown as Partial<import('./storage').User>);
+        console.debug('db.addUser: stored via storage.addUser', { id: u.id, username: u.username, role: u.role });
       }
       try {
         if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'user', entityId: u.id, meta: { username: u.username } });

@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import db from '@/lib/db';
+import * as idb from '@/lib/indexeddb';
+import { getCategories as storageGetCategories } from '@/lib/storage';
 import { Plus, Edit, Trash2, ArrowLeft, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PageContainer from '@/components/PageContainer';
@@ -52,12 +54,17 @@ const Categories = () => {
       description: form.description || undefined,
     };
 
-    if (editing) {
-      await db.updateCategory(editing.id, payload as Category);
-      toast({ title: 'Succès', description: 'Catégorie mise à jour' });
-    } else {
-      await db.addCategory(payload as Category);
-      toast({ title: 'Succès', description: 'Catégorie ajoutée' });
+    try {
+      if (editing) {
+        await db.updateCategory(editing.id, payload as Category);
+        toast({ title: 'Succès', description: 'Catégorie mise à jour' });
+      } else {
+        await db.addCategory(payload as Category);
+        toast({ title: 'Succès', description: 'Catégorie ajoutée' });
+      }
+    } catch (err) {
+      console.error('Failed to save category', err);
+      toast({ title: 'Erreur', description: 'Impossible d\'enregistrer la catégorie', variant: 'destructive' });
     }
 
     setIsDialogOpen(false);
@@ -96,6 +103,30 @@ const Categories = () => {
             <CardTitle>Catégories</CardTitle>
             <div className="flex gap-2">
               <Input placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              {process.env.NODE_ENV === 'development' && (
+                <Button variant="outline" onClick={async () => {
+                  try {
+                    const d = await db.getCategories();
+                    console.debug('db.getCategories()', d);
+                  } catch (err) {
+                    console.error('db.getCategories() error', err);
+                  }
+                  try {
+                    const id = await idb.idbGetAll('categories');
+                    console.debug('idb.idbGetAll("categories")', id);
+                  } catch (err) {
+                    console.error('idb.idbGetAll(categories) error', err);
+                  }
+                  try {
+                    const s = storageGetCategories();
+                    console.debug('storage.getCategories()', s);
+                  } catch (err) {
+                    console.error('storage.getCategories() error', err);
+                  }
+                }}>
+                  Debug dump
+                </Button>
+              )}
               {user?.role === 'admin' && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
