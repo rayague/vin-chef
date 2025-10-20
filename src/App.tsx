@@ -11,6 +11,7 @@ import Clients from "./pages/Clients"; // Users management (page file kept at pa
 import Customers from './pages/Customers';
 import Sales from "./pages/Sales";
 import Invoices from "./pages/Invoices";
+import StockManagement from "./pages/StockManagement";
 import Categories from "./pages/Categories";
 import Reports from "./pages/Reports";
 import AuditLogs from "./pages/AuditLogs";
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/products" element={<Products />} />
               <Route element={<RequireAdmin />}>
                 <Route path="/clients" element={<Clients />} />
+                <Route path="/stock" element={<StockManagement />} />
                 <Route path="/backups" element={<Backups />} />
                 <Route path="/audits" element={<AuditLogs />} />
               </Route>

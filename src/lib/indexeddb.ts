@@ -1,8 +1,8 @@
 // Lightweight native IndexedDB helper for vin-chef (no external deps)
 
 const DB_NAME = 'vin-chef-browser-db';
-const DB_VERSION = 2;
-const STORE_NAMES = ['products', 'clients', 'sales', 'invoices', 'users', 'categories', 'invoice_counter'];
+const DB_VERSION = 3;
+const STORE_NAMES = ['products', 'clients', 'sales', 'invoices', 'users', 'categories', 'invoice_counter', 'stock_movements'];
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

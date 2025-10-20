@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Package, Users, TrendingUp, FileText, Home, LogOut, Layers } from 'lucide-react';
+import { Package, Users, TrendingUp, FileText, Home, LogOut, Layers, Warehouse } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const SidebarItem = ({ to, icon, label, collapsed }: { to: string; icon: ReactNode; label: string; collapsed?: boolean }) => {
@@ -96,6 +96,7 @@ const Layout = () => {
                 <SidebarItem collapsed={collapsed} to="/reports" icon={<TrendingUp />} label="Rapports" />
                 {user?.role === 'admin' && (
                   <>
+                    <SidebarItem collapsed={collapsed} to="/stock" icon={<Warehouse />} label="Gestion de Stock" />
                     {/* Backups and Audit temporarily hidden per request - uncomment to restore */}
                     {/* <SidebarItem collapsed={collapsed} to="/backups" icon={<Layers />} label="Sauvegardes" /> */}
                     {/* <SidebarItem collapsed={collapsed} to="/audits" icon={<FileText />} label="Audit" /> */}

@@ -51,6 +51,9 @@ declare global {
   createSaleWithInvoice?: (...args: unknown[]) => Promise<unknown>;
   updateInvoice?: (...args: unknown[]) => Promise<unknown>;
   deleteInvoice?: (...args: unknown[]) => Promise<unknown>;
+  // Stock movements
+  getStockMovements?: () => Promise<unknown[]>;
+  addStockMovement?: (...args: unknown[]) => Promise<unknown>;
   }
 
   interface ElectronAuthAPI {

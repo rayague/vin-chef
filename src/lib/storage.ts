@@ -36,6 +36,8 @@ export interface Sale {
   date: string;
   invoiceNumber: string;
   createdBy?: string;
+  discount?: number; // Montant de la remise
+  discountType?: 'percentage' | 'fixed'; // Type de remise: pourcentage ou montant fixe
 }
 
 export interface Invoice {
@@ -52,6 +54,8 @@ export interface Invoice {
   tva: number;
   tvaRate?: number;
   createdBy?: string;
+  discount?: number; // Montant de la remise appliquée
+  discountType?: 'percentage' | 'fixed'; // Type de remise
 }
 
 // Storage keys
@@ -64,6 +68,7 @@ const STORAGE_KEYS = {
   CATEGORIES: 'winecellar_categories',
   CURRENT_USER: 'winecellar_current_user',
   INVOICE_COUNTER: 'winecellar_invoice_counter',
+  STOCK_MOVEMENTS: 'winecellar_stock_movements',
 };
 
 // Generic storage functions
@@ -148,6 +153,10 @@ export const addSale = (sale: Sale) => storage.add(STORAGE_KEYS.SALES, sale);
 // Invoices
 export const getInvoices = () => storage.get<Invoice>(STORAGE_KEYS.INVOICES);
 export const addInvoice = (invoice: Invoice) => storage.add(STORAGE_KEYS.INVOICES, invoice);
+
+// Stock Movements
+export const getStockMovements = () => storage.get<StockMovement>(STORAGE_KEYS.STOCK_MOVEMENTS);
+export const addStockMovement = (movement: StockMovement) => storage.add(STORAGE_KEYS.STOCK_MOVEMENTS, movement);
 
 // Current user (session)
 export const setCurrentUser = (user: User | null) => {
@@ -254,6 +263,19 @@ export const initializeDemoData = (force: boolean = false) => {
   storage.set(STORAGE_KEYS.SALES, []);
   storage.set(STORAGE_KEYS.INVOICES, []);
 };
+
+// Stock movements
+export interface StockMovement {
+  id: string;
+  productId: string;
+  type: 'in' | 'out' | 'adjustment'; // Entrée, sortie, ajustement
+  quantity: number; // Quantité (positive pour entrée, négative pour sortie)
+  reason?: string; // Motif (ex: "Réapprovisionnement", "Inventaire", "Casse")
+  date: string;
+  createdBy?: string;
+  previousStock: number; // Stock avant mouvement
+  newStock: number; // Stock après mouvement
+}
 
 // --- Audit helpers for browser fallback ---
 export interface AuditEntry {

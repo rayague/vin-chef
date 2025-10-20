@@ -535,6 +535,40 @@ export const db = {
     }
   },
 
+  // Stock Movements
+  async getStockMovements() {
+    if (isElectronDBAvailable()) {
+      const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
+      if (api && typeof api.getStockMovements === 'function') {
+        return api.getStockMovements();
+      }
+    }
+    try {
+      const items = await idb.idbGetAll<import('./storage').StockMovement>('stock_movements');
+      if (items && items.length > 0) return items;
+    } catch (e) {
+      // ignore
+    }
+    const s = await import('./storage');
+    return s.getStockMovements ? s.getStockMovements() : [];
+  },
+
+  async addStockMovement(movement: import('./storage').StockMovement) {
+    if (isElectronDBAvailable()) {
+      const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
+      if (api && typeof api.addStockMovement === 'function') {
+        return api.addStockMovement(movement);
+      }
+    }
+    try {
+      await idb.idbPut('stock_movements', movement);
+      return movement;
+    } catch (e) {
+      const s = await import('./storage');
+      return s.addStockMovement ? s.addStockMovement(movement) : movement;
+    }
+  },
+
   // Reset demo data (desktop only in preload) - fallback: reinitialize localStorage demo data
   async resetDemoData() {
   if (isElectronDBAvailable() && (window as unknown as Window).electronAPI?.db?.resetDemoData) return (window as unknown as Window).electronAPI!.db!.resetDemoData();

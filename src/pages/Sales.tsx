@@ -35,6 +35,8 @@ const Sales = () => {
     productId: '',
     clientId: '',
     quantity: '',
+    discount: '',
+    discountType: 'percentage' as 'percentage' | 'fixed',
   });
 
   const location = useLocation();
@@ -84,10 +86,23 @@ const Sales = () => {
       return;
     }
 
-  const invoiceNumber = await db.getNextInvoiceNumber();
+    const invoiceNumber = await db.getNextInvoiceNumber();
     const totalHT = product.unitPrice * quantity;
-    const tva = totalHT * 0.18;
-    const totalTTC = totalHT + tva;
+    
+    // Calcul de la remise
+    const discountValue = parseFloat(formData.discount) || 0;
+    let discountAmount = 0;
+    if (discountValue > 0) {
+      if (formData.discountType === 'percentage') {
+        discountAmount = (totalHT * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+    }
+    
+    const totalHTAfterDiscount = totalHT - discountAmount;
+    const tva = totalHTAfterDiscount * 0.18;
+    const totalTTC = totalHTAfterDiscount + tva;
 
     const saleData: Sale = {
       id: Date.now().toString(),
@@ -99,6 +114,8 @@ const Sales = () => {
       date: new Date().toISOString(),
       invoiceNumber,
       createdBy: user?.id,
+      discount: discountAmount > 0 ? discountAmount : undefined,
+      discountType: discountAmount > 0 ? formData.discountType : undefined,
     };
 
     setSaving(true);
@@ -137,6 +154,8 @@ const Sales = () => {
           tva,
           tvaRate: 18,
           createdBy: user?.id,
+          discount: discountAmount > 0 ? discountAmount : undefined,
+          discountType: discountAmount > 0 ? formData.discountType : undefined,
         });
       }
     } catch (err) {
@@ -160,6 +179,8 @@ const Sales = () => {
       totalHT,
       tva,
       totalTTC,
+      discount: discountAmount,
+      discountType: formData.discountType,
     });
 
     downloadInvoice(invoiceNumber, pdf);
@@ -171,7 +192,7 @@ const Sales = () => {
   };
 
   const resetForm = () => {
-    setFormData({ productId: '', clientId: '', quantity: '' });
+    setFormData({ productId: '', clientId: '', quantity: '', discount: '', discountType: 'percentage' });
   };
 
   return (
@@ -237,9 +258,88 @@ const Sales = () => {
                       <Label>Quantité *</Label>
                       <Input type="number" min="1" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
                     </div>
+                    
+                    {/* Section Remise */}
+                    <div className="border-t pt-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-semibold">Remise (optionnelle)</Label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-2">
+                          <Label>Type de remise</Label>
+                          <Select value={formData.discountType} onValueChange={(value: 'percentage' | 'fixed') => setFormData({ ...formData, discountType: value })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="percentage">Pourcentage (%)</SelectItem>
+                              <SelectItem value="fixed">Montant fixe (FCFA)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Valeur</Label>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step={formData.discountType === 'percentage' ? '0.1' : '1'}
+                            max={formData.discountType === 'percentage' ? '100' : undefined}
+                            value={formData.discount} 
+                            onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+                            placeholder={formData.discountType === 'percentage' ? 'Ex: 10' : 'Ex: 5000'}
+                          />
+                        </div>
+                      </div>
+                      {formData.discount && formData.quantity && formData.productId && (() => {
+                        const product = products.find(p => p.id === formData.productId);
+                        if (!product) return null;
+                        const quantity = parseInt(formData.quantity);
+                        const totalHT = product.unitPrice * quantity;
+                        const discountValue = parseFloat(formData.discount) || 0;
+                        let discountAmount = 0;
+                        if (discountValue > 0) {
+                          if (formData.discountType === 'percentage') {
+                            discountAmount = (totalHT * discountValue) / 100;
+                          } else {
+                            discountAmount = discountValue;
+                          }
+                        }
+                        const totalHTAfterDiscount = totalHT - discountAmount;
+                        const tva = totalHTAfterDiscount * 0.18;
+                        const totalTTC = totalHTAfterDiscount + tva;
+                        
+                        return (
+                          <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span>Total HT:</span>
+                              <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
+                            </div>
+                            <div className="flex justify-between text-destructive">
+                              <span>Remise:</span>
+                              <span className="font-medium">- {discountAmount.toLocaleString('fr-FR')} FCFA</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Total HT après remise:</span>
+                              <span className="font-medium">{totalHTAfterDiscount.toLocaleString('fr-FR')} FCFA</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>TVA (18%):</span>
+                              <span className="font-medium">{tva.toLocaleString('fr-FR')} FCFA</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-base pt-1 border-t">
+                              <span>Total TTC:</span>
+                              <span>{totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    
                     <div className="flex gap-2 justify-end">
                       <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
-                      <Button type="submit">Enregistrer</Button>
+                      <Button type="submit" disabled={saving}>
+                        {saving ? 'Enregistrement...' : 'Enregistrer'}
+                      </Button>
                     </div>
                   </form>
                 </DialogContent>
