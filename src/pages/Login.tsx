@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import bcrypt from 'bcryptjs';
 import { useNavigate } from 'react-router-dom';
 import logger from '@/lib/logger';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,9 +39,8 @@ const Login = () => {
           logger.debug('DEV [auto]: admin user not found');
           return;
         }
-        const bcrypt = (await import('bcryptjs')) as typeof import('bcryptjs');
-        const adminHash = String((admin as Record<string, unknown>).passwordHash || '');
-        const ok = await bcrypt.compare('admin123', adminHash);
+  const adminHash = String((admin as Record<string, unknown>).passwordHash || '');
+  const ok = await bcrypt.compare('admin123', adminHash);
   logger.debug('DEV [auto]: bcrypt.compare(admin123, admin.hash) =>', ok);
       } catch (err) {
   logger.error('DEV [auto] diagnostic error', err);
@@ -224,7 +224,6 @@ const Login = () => {
                           return;
                         }
                         // dynamic import bcryptjs to ensure it runs in browser bundle
-                        const bcrypt = (await import('bcryptjs')) as typeof import('bcryptjs');
                         const adminHash = String((admin as Record<string, unknown>).passwordHash || '');
                         const ok = await bcrypt.compare('admin123', adminHash);
                         debug('DEV: bcrypt.compare(admin123, admin.hash) =>', ok);

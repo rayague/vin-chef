@@ -39,6 +39,16 @@ import {
 } from './storage';
 import * as idb from './indexeddb';
 import logger from './logger';
+import bcrypt from 'bcryptjs';
+import {
+  getUsers as storageGetUsers,
+  addUser as storageAddUser,
+  updateUser as storageUpdateUser,
+  deleteUser as storageDeleteUser,
+  addAudit as storageAddAudit,
+  getStockMovements as storageGetStockMovements,
+  addStockMovement as storageAddStockMovement,
+} from './storage';
 
 // Minimal IndexedDB wrapper using idb
 const DB_NAME = 'vin-chef-db';
@@ -289,17 +299,14 @@ export const db = {
         emitChange({ entity: 'sales', action: 'add', id: sale.id });
       // ensure localStorage fallback is also updated (jsdom/node env may not expose IndexedDB reads)
       try {
-        const s = await import('./storage');
-        if (typeof s.addSale === 'function') s.addSale(sale as unknown as import('./storage').Sale);
+        if (typeof storageAddSale === 'function') storageAddSale(sale as unknown as import('./storage').Sale);
         // Also decrement product stock in storage fallback so getProducts() sees the change
         try {
-          if (typeof s.getProducts === 'function' && typeof s.updateProduct === 'function') {
-            const prods = s.getProducts();
-            const p = prods.find((x: unknown) => (x as import('./storage').Product).id === sale.productId) as import('./storage').Product | undefined;
-            if (p) {
-              const newQty = (p.stockQuantity ?? 0) - sale.quantity;
-              s.updateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
-            }
+          const prods = storageGetProducts();
+          const p = prods.find((x: unknown) => (x as import('./storage').Product).id === sale.productId) as import('./storage').Product | undefined;
+          if (p) {
+            const newQty = (p.stockQuantity ?? 0) - sale.quantity;
+            storageUpdateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
           }
         } catch (err) {
           // ignore
@@ -322,9 +329,8 @@ export const db = {
         await idb.idbPut('sales', sale);
         // write audit in fallback storage if available
         try {
-          const s = await import('./storage');
-          if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale } });
-          } catch (err) {
+          if (typeof storageAddAudit === 'function') storageAddAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale } });
+        } catch (err) {
           logger.error('Failed to write audit (addSale fallback)', err);
         }
       } catch (e) {
@@ -372,14 +378,12 @@ export const db = {
       emitChange({ entity: 'invoices', action: 'add', id: invoice.id });
       // ensure localStorage fallback is also updated
       try {
-        const s = await import('./storage');
-  if (typeof s.addInvoice === 'function') s.addInvoice(invoice as unknown as import('./storage').Invoice);
+        if (typeof storageAddInvoice === 'function') storageAddInvoice(invoice as unknown as import('./storage').Invoice);
       } catch (err) {
         // ignore
       }
       try {
-        const s = await import('./storage');
-  if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'invoice', entityId: invoice.id, userId: (invoice as unknown as StorageInvoice).createdBy, meta: { invoice } });
+        if (typeof storageAddAudit === 'function') storageAddAudit({ action: 'create', entity: 'invoice', entityId: invoice.id, userId: (invoice as unknown as StorageInvoice).createdBy, meta: { invoice } });
       } catch (err) {
         logger.error('Failed to write audit (addInvoice fallback)', err);
       }
@@ -411,8 +415,7 @@ export const db = {
   // fallback: sale/invoice were created sequentially
     try {
       // attempt to write a combined audit in fallback
-      const st = await import('./storage');
-  if (typeof st.addAudit === 'function') st.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale, invoice } });
+      if (typeof storageAddAudit === 'function') storageAddAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale, invoice } });
     } catch (err) {
       logger.error('Failed to write audit (createSaleWithInvoice fallback)', err);
     }
@@ -467,8 +470,7 @@ export const db = {
     }
     // fallback to storage
     try {
-      const s = await import('./storage');
-      return s.getUsers ? (s.getUsers() as StorageUser[]) : [];
+      return storageGetUsers ? (storageGetUsers() as StorageUser[]) : [];
     } catch (e) {
       return [] as Array<{ id: string; username: string; role: string; created_at: string }>;
     }
@@ -492,15 +494,13 @@ export const db = {
     }
     // fallback to storage
     try {
-      const s = await import('./storage');
-      const bcrypt = await import('bcryptjs');
       const u: StorageUser = { id: user.id, username: user.username, passwordHash: bcrypt.hashSync(user.password || 'changeme', 10), role: user.role || 'commercial' };
-      if (typeof s.addUser === 'function') {
-        s.addUser(u as unknown as Partial<import('./storage').User>);
+      if (typeof storageAddUser === 'function') {
+        storageAddUser(u as unknown as Partial<import('./storage').User>);
         emitChange({ entity: 'users', action: 'add', id: u.id });
       }
       try {
-        if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'user', entityId: u.id, meta: { username: u.username } });
+        if (typeof storageAddAudit === 'function') storageAddAudit({ action: 'create', entity: 'user', entityId: u.id, meta: { username: u.username } });
       } catch (err) {
         logger.error('Failed to write audit (create user) fallback', err);
       }
@@ -524,20 +524,18 @@ export const db = {
       }
     }
     try {
-      const s = await import('./storage');
-      const bcrypt = await import('bcryptjs');
       const uUpdates: Partial<StorageUser> = {};
       if (updates.username) uUpdates.username = updates.username;
       if (updates.role) uUpdates.role = updates.role;
       if (updates.password) uUpdates.passwordHash = bcrypt.hashSync(updates.password, 10);
-      if (typeof s.updateUser === 'function') {
-  s.updateUser(id, uUpdates as unknown as Partial<StorageUser>);
+      if (typeof storageUpdateUser === 'function') {
+        storageUpdateUser(id, uUpdates as unknown as Partial<StorageUser>);
       }
-      const users = s.getUsers ? (s.getUsers() as StorageUser[]) : [];
+      const users = storageGetUsers ? (storageGetUsers() as StorageUser[]) : [];
       try {
-        if (typeof s.addAudit === 'function') s.addAudit({ action: 'update', entity: 'user', entityId: id, meta: { updates } });
+        if (typeof storageAddAudit === 'function') storageAddAudit({ action: 'update', entity: 'user', entityId: id, meta: { updates } });
       } catch (err) {
-        logger.error('Failed to write audit (update user) fallback', err);
+        logger.error('Failed to write audit (update user)', err);
       }
       emitChange({ entity: 'users', action: 'update', id });
       return users.find(x => x.id === id) || null;
@@ -560,10 +558,9 @@ export const db = {
       }
     }
     try {
-      const s = await import('./storage');
-      if (typeof s.deleteUser === 'function') s.deleteUser(id);
+      if (typeof storageDeleteUser === 'function') storageDeleteUser(id);
       try {
-        if (typeof s.addAudit === 'function') s.addAudit({ action: 'delete', entity: 'user', entityId: id });
+        if (typeof storageAddAudit === 'function') storageAddAudit({ action: 'delete', entity: 'user', entityId: id });
       } catch (err) {
         logger.error('Failed to write audit (delete user) fallback', err);
       }
@@ -597,27 +594,12 @@ export const db = {
     } catch (e) {
       // ignore
     }
-    const s = await import('./storage');
-    return s.getStockMovements ? s.getStockMovements() : [];
-  },
-
-  async addStockMovement(movement: import('./storage').StockMovement) {
-    if (isElectronDBAvailable()) {
-      const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
-      if (api && typeof api.addStockMovement === 'function') {
-        return api.addStockMovement(movement);
-      }
-    }
     try {
-      await idb.idbPut('stock_movements', movement);
-      emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
-      return movement;
+      return storageGetStockMovements ? storageGetStockMovements() : [];
     } catch (e) {
-      const s = await import('./storage');
-      const res = s.addStockMovement ? s.addStockMovement(movement) : movement;
-      emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
-      return res;
+      return [];
     }
+
   },
 
   // Reset demo data (desktop only in preload) - fallback: reinitialize localStorage demo data
