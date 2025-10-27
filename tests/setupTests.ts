@@ -3,7 +3,8 @@ import { vi } from 'vitest';
 // If running under jsdom (window exists) enable testing-library and DOM mocks
 if (typeof window !== 'undefined') {
 	// jest-dom for DOM matchers
-	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	// Allow require here because this setup file runs under test runner environments
+	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	require('@testing-library/jest-dom');
 
 	// Mock embla-carousel-react used by Carousel so api.on/off exist in tests
@@ -28,7 +29,7 @@ if (typeof window !== 'undefined') {
 	// Node environment (integration tests): provide minimal localStorage polyfill
 	// so storage.initializeDemoData and other localStorage-using code works.
 	// This is intentionally tiny and only supports what tests need.
-	// @ts-ignore
+	// @ts-expect-error: adding a minimal localStorage polyfill for node-based integration tests
 	global.localStorage = (function () {
 		let store: Record<string, string> = {};
 		return {
