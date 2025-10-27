@@ -6,6 +6,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { Button } from '@/components/ui/button';
 import { Package, Users, TrendingUp, FileText, Home, LogOut, Layers, Warehouse } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import logger from '@/lib/logger';
 
 const SidebarItem = ({ to, icon, label, collapsed }: { to: string; icon: ReactNode; label: string; collapsed?: boolean }) => {
   const loc = useLocation();
@@ -28,7 +29,7 @@ const Layout = () => {
 
   if (import.meta.env.DEV) {
     // quick dev-only debug to help locate sidebar rendering issues
-    console.debug('[DEV] Layout sidebar rendered, collapsed=', collapsed, 'width=', sidebarWidth);
+    logger.debug('[DEV] Layout sidebar rendered, collapsed=', collapsed, 'width=', sidebarWidth);
   }
 
   return (

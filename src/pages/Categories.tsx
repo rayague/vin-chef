@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import db from '@/lib/db';
 import * as idb from '@/lib/indexeddb';
 import { getCategories as storageGetCategories } from '@/lib/storage';
+import logger from '@/lib/logger';
 import { Plus, Edit, Trash2, ArrowLeft, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PageContainer from '@/components/PageContainer';
@@ -23,6 +24,7 @@ const Categories = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editing, setEditing] = useState<{ id: string; name: string; description?: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', description: '' });
   const [search, setSearch] = useState('');
 
@@ -32,6 +34,22 @@ const Categories = () => {
       const list = await db.getCategories();
       setCategories(list as Category[]);
     })();
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (detail.entity === 'categories' || detail.entity === 'products' || detail.entity === 'clients') {
+          (async () => {
+            const list = await db.getCategories();
+            setCategories(list as Category[]);
+          })();
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate]);
 
   const load = async () => {
@@ -63,7 +81,7 @@ const Categories = () => {
         toast({ title: 'Succès', description: 'Catégorie ajoutée' });
       }
     } catch (err) {
-      console.error('Failed to save category', err);
+      logger.error('Failed to save category', err);
       toast({ title: 'Erreur', description: 'Impossible d\'enregistrer la catégorie', variant: 'destructive' });
     }
 
@@ -80,11 +98,7 @@ const Categories = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Supprimer cette catégorie ?')) {
-      await db.deleteCategory(id);
-      toast({ title: 'Succès', description: 'Catégorie supprimée' });
-      load();
-    }
+    setDeleteTarget(id);
   };
 
   const filtered = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
@@ -107,21 +121,21 @@ const Categories = () => {
                 <Button variant="outline" onClick={async () => {
                   try {
                     const d = await db.getCategories();
-                    console.debug('db.getCategories()', d);
+                    logger.debug('db.getCategories()', d);
                   } catch (err) {
-                    console.error('db.getCategories() error', err);
+                    logger.error('db.getCategories() error', err);
                   }
                   try {
                     const id = await idb.idbGetAll('categories');
-                    console.debug('idb.idbGetAll("categories")', id);
+                    logger.debug('idb.idbGetAll("categories")', id);
                   } catch (err) {
-                    console.error('idb.idbGetAll(categories) error', err);
+                    logger.error('idb.idbGetAll(categories) error', err);
                   }
                   try {
                     const s = storageGetCategories();
-                    console.debug('storage.getCategories()', s);
+                    logger.debug('storage.getCategories()', s);
                   } catch (err) {
-                    console.error('storage.getCategories() error', err);
+                    logger.error('storage.getCategories() error', err);
                   }
                 }}>
                   Debug dump
@@ -199,6 +213,29 @@ const Categories = () => {
           )}
         </CardContent>
       </Card>
+      {/* Delete confirmation dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-card p-6 rounded w-[420px]">
+            <h3 className="text-lg font-semibold mb-2">Confirmer la suppression</h3>
+            <p className="text-sm text-muted-foreground mb-4">Voulez-vous vraiment supprimer cette catégorie ? Cette action est irréversible.</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)}>Annuler</Button>
+              <Button variant="destructive" onClick={async () => {
+                try {
+                  await db.deleteCategory(deleteTarget!);
+                  toast({ title: 'Succès', description: 'Catégorie supprimée' });
+                  setDeleteTarget(null);
+                  load();
+                } catch (err) {
+                  logger.error('delete category', err);
+                  toast({ title: 'Erreur', description: 'Impossible de supprimer la catégorie', variant: 'destructive' });
+                }
+              }}>Supprimer</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageContainer>
   );
 };

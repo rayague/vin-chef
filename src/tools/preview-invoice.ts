@@ -1,6 +1,8 @@
-import { generateInvoicePDF } from '../lib/pdf';
+import { generateInvoicePDF, InvoiceData } from '../lib/pdf';
+import jsPDF from 'jspdf';
+import logger from '@/lib/logger';
 
-const sample = {
+const sample: InvoiceData = {
   invoiceNumber: 'FAC-2025-00002',
   date: new Date().toISOString(),
   clientName: 'Hôtel Royal Palace',
@@ -17,7 +19,7 @@ const sample = {
   paymentTerms: 'À réception',
 };
 
-const doc = generateInvoicePDF(sample as any);
+const doc: jsPDF = generateInvoicePDF(sample);
 // Save to a file in project root (Node environment) is not possible here without fs bindings
 // Instead, print a success message indicating we generated the doc object
-console.log('Generated PDF jsPDF object with num pages:', (doc as any).getNumberOfPages());
+logger.info('Generated PDF jsPDF object with num pages:', typeof doc.getNumberOfPages === 'function' ? doc.getNumberOfPages() : 1);

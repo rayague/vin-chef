@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import bcrypt from 'bcryptjs';
 import { User, getCurrentUser, setCurrentUser, initializeDemoData } from '@/lib/storage';
 import db from '@/lib/db';
+import logger from '@/lib/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -33,17 +34,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (typeof window !== 'undefined' && window.electronAPI?.auth?.login) {
         try {
           const res = await window.electronAPI.auth.login(username, password);
-          console.debug('useAuth: auth.login response', res);
+          logger.debug('useAuth: auth.login response', res);
           if (res && res.success) {
             const safeUser: User = { id: res.user.id, username: res.user.username, role: res.user.role, passwordHash: '' } as User;
             setUser(safeUser);
             setCurrentUser(safeUser);
             return true;
           }
-          console.warn('useAuth: auth.login failed for', username);
+          logger.warn('useAuth: auth.login failed for', username);
           return false;
         } catch (err) {
-          console.error('useAuth: auth.login threw', err);
+          logger.error('useAuth: auth.login threw', err);
           return false;
         }
       }
@@ -55,7 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If not found and we're in DEV, attempt to re-seed demo data once and retry (helps when dev server changed without restart)
       if (!foundUser && import.meta.env.DEV) {
         try {
-          console.debug('useAuth [DEV]: user not found via db, forcing demo seed and retrying');
+          logger.debug('useAuth [DEV]: user not found via db, forcing demo seed and retrying');
           // Prefer the db reset which handles IndexedDB + storage fallback
           if (typeof db.resetDemoData === 'function') {
             try { await db.resetDemoData(); } catch (e) { /* ignore */ }
@@ -63,12 +64,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           initializeDemoData(true);
           foundUser = await db.getUserByUsername(username);
         } catch (err) {
-          console.error('useAuth [DEV]: initializeDemoData failed', err);
+          logger.error('useAuth [DEV]: initializeDemoData failed', err);
         }
       }
 
       if (!foundUser) {
-        console.warn('useAuth: no local user found for', username);
+  logger.warn('useAuth: no local user found for', username);
         return false;
       }
 
@@ -78,7 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const foundUserAny = foundUser as any;
       // Developer-friendly debug: in dev show the stored hash and attempt compare so we can see why it fails
       if (import.meta.env.DEV) {
-        console.debug('useAuth [DEV]: foundUser', { username: foundUserAny?.username, passwordHash: foundUserAny?.passwordHash });
+  logger.debug('useAuth [DEV]: foundUser', { username: foundUserAny?.username, passwordHash: foundUserAny?.passwordHash });
       }
 
       let isValid = false;
@@ -86,10 +87,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const hash = foundUserAny?.passwordHash;
         if (hash) isValid = await bcrypt.compare(password, hash);
       } catch (err) {
-        console.error('useAuth: bcrypt.compare threw', err);
+  logger.error('useAuth: bcrypt.compare threw', err);
       }
 
-      console.debug('useAuth: bcrypt.compare result for', username, isValid);
+  logger.debug('useAuth: bcrypt.compare result for', username, isValid);
       if (isValid) {
         // Create a safe user object that matches the `User` shape expected by the app
         const safeUser: User = { id: foundUserAny.id, username: foundUserAny.username, role: foundUserAny.role, passwordHash: foundUserAny.passwordHash || '' } as User;
@@ -101,14 +102,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // If invalid in DEV, try one more time after forcing demo seed (covers situation where hashes were missing)
       if (import.meta.env.DEV) {
         try {
-          console.debug('useAuth [DEV]: invalid password, forcing demo seed and retrying compare');
+          logger.debug('useAuth [DEV]: invalid password, forcing demo seed and retrying compare');
           initializeDemoData(true);
           const retryUser = await db.getUserByUsername(username);
           if (retryUser) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const retryUserAny = retryUser as any;
             const retryValid = retryUserAny?.passwordHash ? await bcrypt.compare(password, retryUserAny.passwordHash) : false;
-            console.debug('useAuth [DEV]: retry bcrypt.compare result for', username, retryValid);
+            logger.debug('useAuth [DEV]: retry bcrypt.compare result for', username, retryValid);
             if (retryValid) {
               const safeRetry: User = { id: retryUserAny.id, username: retryUserAny.username, role: retryUserAny.role, passwordHash: retryUserAny.passwordHash || '' } as User;
               setUser(safeRetry);
@@ -117,14 +118,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           }
         } catch (err) {
-          console.error('useAuth [DEV]: retry after seed failed', err);
+          logger.error('useAuth [DEV]: retry after seed failed', err);
         }
       }
 
-      console.warn('useAuth: invalid password for', username);
+  logger.warn('useAuth: invalid password for', username);
       return false;
     } catch (error) {
-      console.error('Login error:', error);
+  logger.error('Login error:', error);
       return false;
     }
   };

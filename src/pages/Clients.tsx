@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import logger from '@/lib/logger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,7 +84,7 @@ const UsersPage = () => {
         toast({ title: 'Succès', description: 'Utilisateur ajouté' });
       }
     } catch (err) {
-      console.error('user save error', err);
+      logger.error('user save error', err);
       toast({ title: 'Erreur', description: 'Impossible d\'enregistrer l\'utilisateur', variant: 'destructive' });
     } finally {
       setSaving(false);
@@ -115,7 +116,7 @@ const UsersPage = () => {
       toast({ title: 'Succès', description: 'Utilisateur supprimé' });
       loadUsers();
     } catch (err) {
-      console.error('delete user error', err);
+      logger.error('delete user error', err);
       toast({ title: 'Erreur', description: 'Impossible de supprimer l\'utilisateur', variant: 'destructive' });
     } finally {
       setDeleteTarget(null);
@@ -172,21 +173,21 @@ const UsersPage = () => {
                   <Button variant="outline" onClick={async () => {
                     try {
                       const d = await db.getUsers();
-                      console.debug('db.getUsers()', d);
+                      logger.debug('db.getUsers()', d);
                     } catch (err) {
-                      console.error('db.getUsers() error', err);
+                      logger.error('db.getUsers() error', err);
                     }
                     try {
                       const id = await idb.idbGetAll('users');
-                      console.debug('idb.idbGetAll("users")', id);
+                      logger.debug('idb.idbGetAll("users")', id);
                     } catch (err) {
-                      console.error('idb.idbGetAll(users) error', err);
+                      logger.error('idb.idbGetAll(users) error', err);
                     }
                     try {
                       const s = storageGetUsers();
-                      console.debug('storage.getUsers()', s);
+                      logger.debug('storage.getUsers()', s);
                     } catch (err) {
-                      console.error('storage.getUsers() error', err);
+                      logger.error('storage.getUsers() error', err);
                     }
                   }}>
                     Debug users

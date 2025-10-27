@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Product, StockMovement } from '@/lib/storage';
 import db from '@/lib/db';
+import logger from '@/lib/logger';
 import { Plus, ArrowLeft, Package, TrendingUp, TrendingDown, AlertCircle, Download, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -129,7 +130,7 @@ const StockManagement = () => {
       resetForm();
       loadData();
     } catch (err) {
-      console.error('Failed to save stock movement', err);
+      logger.error('Failed to save stock movement', err);
       toast({ title: 'Erreur', description: 'Échec lors de l\'enregistrement', variant: 'destructive' });
     } finally {
       setSaving(false);

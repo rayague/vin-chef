@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Product } from '@/lib/storage';
 import db from '@/lib/db';
+import logger from '@/lib/logger';
 import { Plus, Edit, Trash2, ArrowLeft, Package } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +23,7 @@ const Products = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const [formData, setFormData] = useState({
@@ -48,6 +50,17 @@ const Products = () => {
         // ignore
       }
     })();
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (detail.entity === 'products' || detail.entity === 'categories' || detail.entity === 'stock_movements') loadProducts();
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate]);
 
   const loadProducts = async () => {
@@ -103,11 +116,7 @@ const Products = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
-      await db.deleteProduct(id);
-      toast({ title: 'Succès', description: 'Produit supprimé avec succès' });
-      loadProducts();
-    }
+    setDeleteTarget(id);
   };
 
   const resetForm = () => {
@@ -285,6 +294,29 @@ const Products = () => {
             )}
           </CardContent>
         </Card>
+        {/* Delete confirmation dialog */}
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-card p-6 rounded w-[420px]">
+              <h3 className="text-lg font-semibold mb-2">Confirmer la suppression</h3>
+              <p className="text-sm text-muted-foreground mb-4">Voulez-vous vraiment supprimer ce produit ? Cette action est irréversible.</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDeleteTarget(null)}>Annuler</Button>
+                <Button variant="destructive" onClick={async () => {
+                  try {
+                    await db.deleteProduct(deleteTarget!);
+                    toast({ title: 'Succès', description: 'Produit supprimé avec succès' });
+                    setDeleteTarget(null);
+                    loadProducts();
+                  } catch (err) {
+                    logger.error('delete product', err);
+                    toast({ title: 'Erreur', description: 'Impossible de supprimer le produit', variant: 'destructive' });
+                  }
+                }}>Supprimer</Button>
+              </div>
+            </div>
+          </div>
+        )}
     </PageContainer>
   );
 };

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Sale, Product, Client, Invoice } from '@/lib/storage';
 import db from '@/lib/db';
+import logger from '@/lib/logger';
 import { generateInvoicePDF, downloadInvoice } from '@/lib/pdf';
 import { Plus, ArrowLeft, TrendingUp, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -65,7 +66,30 @@ const Sales = () => {
       setFormData(prev => ({ ...prev, clientId: clientIdFromState }));
       setIsDialogOpen(true);
     }
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (detail.entity === 'products' || detail.entity === 'clients' || detail.entity === 'sales') loadData();
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate, location, loadData]);
+
+  // Auto-fill discount when client selection changes
+  useEffect(() => {
+    if (!formData.clientId) return;
+    const client = clients.find(c => c.id === formData.clientId);
+    if (!client) return;
+    // the client may have discount/discountType saved
+    const anyClient = client as unknown as { discount?: number; discountType?: 'percentage' | 'fixed' };
+    if (anyClient.discount !== undefined && anyClient.discount !== null) {
+      setFormData(prev => ({ ...prev, discount: String(anyClient.discount), discountType: anyClient.discountType || 'percentage' }));
+    }
+  }, [formData.clientId, clients]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,7 +183,7 @@ const Sales = () => {
         });
       }
     } catch (err) {
-      console.error('Failed to save sale/invoice', err);
+      logger.error('Failed to save sale/invoice', err);
       toast({ title: 'Erreur', description: 'Échec lors de l\'enregistrement de la vente', variant: 'destructive' });
       setSaving(false);
       return;
@@ -372,7 +396,7 @@ const Sales = () => {
                         setIsClientDialogOpen(false);
                         setClientForm({ firstName: '', lastName: '', phone: '' });
                       } catch (err) {
-                        console.error('Failed to add client', err);
+                        logger.error('Failed to add client', err);
                         toast({ title: 'Erreur', description: 'Impossible d\'ajouter le client', variant: 'destructive' });
                       }
                     }} className="space-y-4">

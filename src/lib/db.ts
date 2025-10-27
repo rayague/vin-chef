@@ -38,6 +38,7 @@ import {
   deleteCategory as storageDeleteCategory,
 } from './storage';
 import * as idb from './indexeddb';
+import logger from './logger';
 
 // Minimal IndexedDB wrapper using idb
 const DB_NAME = 'vin-chef-db';
@@ -54,6 +55,16 @@ async function openAppDB() {
 }
 
 const isElectronDBAvailable = () => typeof window !== 'undefined' && !!(window as unknown as Window).electronAPI?.db;
+
+function emitChange(detail: { entity: string; action: string; id?: string }) {
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('vinchef:data-changed', { detail }));
+    }
+  } catch (e) {
+    // ignore
+  }
+}
 
 // Local storage user shape for fallback operations
 type StorageUser = { id: string; username: string; passwordHash?: string; role: string; email?: string; phone?: string };
@@ -80,9 +91,12 @@ export const db = {
     }
     try {
       await idb.idbPut('products', product);
+      emitChange({ entity: 'products', action: 'add', id: product.id });
       return product;
     } catch (e) {
-      return storageAddProduct(product);
+      const res = storageAddProduct(product);
+      emitChange({ entity: 'products', action: 'add', id: product.id });
+      return res;
     }
   },
   async updateProduct(id: string, updates: Partial<StorageProduct>) {
@@ -94,9 +108,12 @@ export const db = {
       if (!existing) return null;
       const updated = { ...existing, ...updates } as StorageProduct;
       await idb.idbPut('products', updated);
+      emitChange({ entity: 'products', action: 'update', id });
       return updated;
     } catch (e) {
-      return storageUpdateProduct(id, updates);
+      const res = storageUpdateProduct(id, updates);
+      emitChange({ entity: 'products', action: 'update', id });
+      return res;
     }
   },
 
@@ -106,9 +123,12 @@ export const db = {
     }
     try {
       await idb.idbDelete('products', id);
+      emitChange({ entity: 'products', action: 'delete', id });
       return true;
     } catch (e) {
-      return storageDeleteProduct(id);
+      const res = storageDeleteProduct(id);
+      emitChange({ entity: 'products', action: 'delete', id });
+      return res;
     }
   },
 
@@ -147,12 +167,11 @@ export const db = {
     }
     try {
       await idb.idbPut('categories', category);
-      console.debug('db.addCategory: wrote to idb', category);
+      emitChange({ entity: 'categories', action: 'add', id: category.id });
       return category;
     } catch (e) {
-      console.error('db.addCategory: idb write failed, falling back to storageAddCategory', e);
       const res = storageAddCategory(category);
-      console.debug('db.addCategory: storageAddCategory result', res);
+      emitChange({ entity: 'categories', action: 'add', id: category.id });
       return res;
     }
   },
@@ -166,9 +185,12 @@ export const db = {
       if (!existing) return null;
       const updated = { ...existing, ...updates } as { id: string; name: string; description?: string };
       await idb.idbPut('categories', updated);
+      emitChange({ entity: 'categories', action: 'update', id });
       return updated;
     } catch (e) {
-      return storageUpdateCategory(id, updates);
+      const res = storageUpdateCategory(id, updates);
+      emitChange({ entity: 'categories', action: 'update', id });
+      return res;
     }
   },
 
@@ -178,9 +200,12 @@ export const db = {
     }
     try {
       await idb.idbDelete('categories', id);
+      emitChange({ entity: 'categories', action: 'delete', id });
       return true;
     } catch (e) {
-      return storageDeleteCategory(id);
+      const res = storageDeleteCategory(id);
+      emitChange({ entity: 'categories', action: 'delete', id });
+      return res;
     }
   },
 
@@ -190,9 +215,12 @@ export const db = {
     }
     try {
       await idb.idbPut('clients', client);
+      emitChange({ entity: 'clients', action: 'add', id: client.id });
       return client;
     } catch (e) {
-      return storageAddClient(client);
+      const res = storageAddClient(client);
+      emitChange({ entity: 'clients', action: 'add', id: client.id });
+      return res;
     }
   },
 
@@ -205,9 +233,12 @@ export const db = {
     if (!existing) return null;
     const updated = { ...existing, ...updates } as StorageClient;
     await idb.idbPut('clients', updated);
+    emitChange({ entity: 'clients', action: 'update', id });
     return updated;
   } catch (e) {
-    return storageUpdateClient(id, updates);
+    const res = storageUpdateClient(id, updates);
+    emitChange({ entity: 'clients', action: 'update', id });
+    return res;
   }
   },
 
@@ -217,9 +248,12 @@ export const db = {
     }
     try {
       await idb.idbDelete('clients', id);
+      emitChange({ entity: 'clients', action: 'delete', id });
       return true;
     } catch (e) {
-      return storageDeleteClient(id);
+      const res = storageDeleteClient(id);
+      emitChange({ entity: 'clients', action: 'delete', id });
+      return res;
     }
   },
 
@@ -245,13 +279,14 @@ export const db = {
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, (sale as unknown as StorageSale).createdBy || undefined, { sale });
         } catch (err) {
-          console.error('Failed to write audit (addSale electron)', err);
+          logger.error('Failed to write audit (addSale electron)', err);
         }
         return res as StorageSale;
       }
     }
-    try {
-      await idb.idbPut('sales', sale);
+      try {
+        await idb.idbPut('sales', sale);
+        emitChange({ entity: 'sales', action: 'add', id: sale.id });
       // ensure localStorage fallback is also updated (jsdom/node env may not expose IndexedDB reads)
       try {
         const s = await import('./storage');
@@ -273,30 +308,35 @@ export const db = {
         // ignore
       }
       // decrement product stock in idb if present
-      try {
-        const prod = await idb.idbGet<StorageProduct>('products', sale.productId);
-        if (prod) {
-          prod.stockQuantity = (prod.stockQuantity || 0) - sale.quantity;
-          await idb.idbPut('products', prod);
+        try {
+          const prod = await idb.idbGet<StorageProduct>('products', sale.productId);
+          if (prod) {
+            prod.stockQuantity = (prod.stockQuantity || 0) - sale.quantity;
+            await idb.idbPut('products', prod);
+            emitChange({ entity: 'products', action: 'update', id: prod.id });
+          }
+        } catch (err) {
+          // ignore
         }
-      } catch (err) {
-        // ignore
-      }
       try {
         await idb.idbPut('sales', sale);
         // write audit in fallback storage if available
         try {
           const s = await import('./storage');
           if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale } });
-        } catch (err) {
-          console.error('Failed to write audit (addSale fallback)', err);
+          } catch (err) {
+          logger.error('Failed to write audit (addSale fallback)', err);
         }
       } catch (e) {
-        return storageAddSale(sale);
+        const res = storageAddSale(sale);
+        emitChange({ entity: 'sales', action: 'add', id: sale.id });
+        return res;
       }
       return sale;
     } catch (e) {
-      return storageAddSale(sale);
+      const res = storageAddSale(sale);
+      emitChange({ entity: 'sales', action: 'add', id: sale.id });
+      return res;
     }
   },
 
@@ -322,13 +362,14 @@ export const db = {
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'invoice', invoice.id, (invoice as unknown as StorageInvoice).createdBy || undefined, { invoice });
         } catch (err) {
-          console.error('Failed to write audit (addInvoice electron)', err);
+          logger.error('Failed to write audit (addInvoice electron)', err);
         }
         return res as StorageInvoice;
       }
     }
     try {
       await idb.idbPut('invoices', invoice);
+      emitChange({ entity: 'invoices', action: 'add', id: invoice.id });
       // ensure localStorage fallback is also updated
       try {
         const s = await import('./storage');
@@ -340,11 +381,13 @@ export const db = {
         const s = await import('./storage');
   if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'invoice', entityId: invoice.id, userId: (invoice as unknown as StorageInvoice).createdBy, meta: { invoice } });
       } catch (err) {
-        console.error('Failed to write audit (addInvoice fallback)', err);
+        logger.error('Failed to write audit (addInvoice fallback)', err);
       }
       return invoice;
     } catch (e) {
-      return storageAddInvoice(invoice);
+      const res = storageAddInvoice(invoice);
+      emitChange({ entity: 'invoices', action: 'add', id: invoice.id });
+      return res;
     }
   },
 
@@ -357,7 +400,7 @@ export const db = {
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, (sale as unknown as StorageSale).createdBy || undefined, { sale, invoice });
         } catch (err) {
-          console.error('Failed to write audit (createSaleWithInvoice electron)', err);
+          logger.error('Failed to write audit (createSaleWithInvoice electron)', err);
         }
         return res;
       }
@@ -371,7 +414,7 @@ export const db = {
       const st = await import('./storage');
   if (typeof st.addAudit === 'function') st.addAudit({ action: 'create', entity: 'sale', entityId: sale.id, userId: (sale as unknown as StorageSale).createdBy, meta: { sale, invoice } });
     } catch (err) {
-      console.error('Failed to write audit (createSaleWithInvoice fallback)', err);
+      logger.error('Failed to write audit (createSaleWithInvoice fallback)', err);
     }
     // storage state updated by fallback writes
     return { sale: s, invoice: inv };
@@ -391,6 +434,7 @@ export const db = {
       if (isImmutable) throw new Error('Invoice is immutable');
       const updated = { ...existing, ...updates } as StorageInvoice;
       await idb.idbPut('invoices', updated);
+      emitChange({ entity: 'invoices', action: 'update', id });
       return updated;
     } catch (e) {
       return null;
@@ -403,8 +447,10 @@ export const db = {
     }
     try {
       await idb.idbDelete('invoices', id);
+      emitChange({ entity: 'invoices', action: 'delete', id });
       return true;
     } catch (e) {
+      emitChange({ entity: 'invoices', action: 'delete', id });
       return false;
     }
   },
@@ -439,7 +485,7 @@ export const db = {
             await api.addAudit('create', 'user', newId, undefined, { username: user.username });
           }
         } catch (e) {
-          console.error('Failed to write audit (create user)', e);
+          logger.error('Failed to write audit (create user)', e);
         }
         return res;
       }
@@ -451,12 +497,12 @@ export const db = {
       const u: StorageUser = { id: user.id, username: user.username, passwordHash: bcrypt.hashSync(user.password || 'changeme', 10), role: user.role || 'commercial' };
       if (typeof s.addUser === 'function') {
         s.addUser(u as unknown as Partial<import('./storage').User>);
-        console.debug('db.addUser: stored via storage.addUser', { id: u.id, username: u.username, role: u.role });
+        emitChange({ entity: 'users', action: 'add', id: u.id });
       }
       try {
         if (typeof s.addAudit === 'function') s.addAudit({ action: 'create', entity: 'user', entityId: u.id, meta: { username: u.username } });
       } catch (err) {
-        console.error('Failed to write audit (create user) fallback', err);
+        logger.error('Failed to write audit (create user) fallback', err);
       }
       return u;
     } catch (e) {
@@ -472,7 +518,7 @@ export const db = {
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('update', 'user', id, undefined, { updates });
         } catch (e) {
-          console.error('Failed to write audit (update user)', e);
+            logger.error('Failed to write audit (update user)', e);
         }
         return res;
       }
@@ -491,8 +537,9 @@ export const db = {
       try {
         if (typeof s.addAudit === 'function') s.addAudit({ action: 'update', entity: 'user', entityId: id, meta: { updates } });
       } catch (err) {
-        console.error('Failed to write audit (update user) fallback', err);
+        logger.error('Failed to write audit (update user) fallback', err);
       }
+      emitChange({ entity: 'users', action: 'update', id });
       return users.find(x => x.id === id) || null;
     } catch (e) {
       throw new Error('updateUser not supported in this environment');
@@ -507,20 +554,21 @@ export const db = {
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('delete', 'user', id, undefined, null);
         } catch (e) {
-          console.error('Failed to write audit (delete user)', e);
+          logger.error('Failed to write audit (delete user)', e);
         }
         return res;
       }
     }
     try {
-  const s = await import('./storage');
-  if (typeof s.deleteUser === 'function') s.deleteUser(id);
-  try {
-    if (typeof s.addAudit === 'function') s.addAudit({ action: 'delete', entity: 'user', entityId: id });
-  } catch (err) {
-    console.error('Failed to write audit (delete user) fallback', err);
-  }
-  return true;
+      const s = await import('./storage');
+      if (typeof s.deleteUser === 'function') s.deleteUser(id);
+      try {
+        if (typeof s.addAudit === 'function') s.addAudit({ action: 'delete', entity: 'user', entityId: id });
+      } catch (err) {
+        logger.error('Failed to write audit (delete user) fallback', err);
+      }
+      emitChange({ entity: 'users', action: 'delete', id });
+      return true;
     } catch (e) {
       throw new Error('deleteUser not supported in this environment');
     }
@@ -562,10 +610,13 @@ export const db = {
     }
     try {
       await idb.idbPut('stock_movements', movement);
+      emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
       return movement;
     } catch (e) {
       const s = await import('./storage');
-      return s.addStockMovement ? s.addStockMovement(movement) : movement;
+      const res = s.addStockMovement ? s.addStockMovement(movement) : movement;
+      emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
+      return res;
     }
   },
 
@@ -582,7 +633,7 @@ export const db = {
       }
       return true;
     } catch (err) {
-      console.error('db.resetDemoData fallback failed', err);
+      logger.error('db.resetDemoData fallback failed', err);
       return false;
     }
   },

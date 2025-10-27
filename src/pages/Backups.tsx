@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import db from '@/lib/db';
 import { useToast } from '@/components/ui/use-toast';
+import logger from '@/lib/logger';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 
@@ -15,7 +16,7 @@ const BackupsPage: React.FC = () => {
       const list = await db.listBackups();
       setBackups(Array.isArray(list) ? (list as string[]) : []);
     } catch (err) {
-      console.error('listBackups error', err);
+      logger.error('listBackups error', err);
       toast({ title: 'Erreur', description: 'Impossible de lister les sauvegardes.' });
     } finally {
       setLoading(false);
@@ -50,7 +51,7 @@ const BackupsPage: React.FC = () => {
         toast({ title: 'Échec', description: res?.error || 'Erreur lors de la restauration' });
       }
     } catch (err) {
-      console.error('restore error', err);
+      logger.error('restore error', err);
       toast({ title: 'Échec', description: 'Erreur lors de la restauration' });
     } finally {
       setRestoring(false);

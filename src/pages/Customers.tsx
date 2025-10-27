@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import db from '@/lib/db';
+import logger from '@/lib/logger';
 import { Client } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import { Plus } from 'lucide-react';
@@ -20,7 +21,8 @@ const Customers = () => {
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '' });
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' as 'percentage' | 'fixed' });
 
   const load = async () => {
     const c = await db.getClients();
@@ -29,6 +31,17 @@ const Customers = () => {
 
   useEffect(() => {
     load();
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (detail.entity === 'clients' || detail.entity === 'categories' || detail.entity === 'products' || detail.entity === 'sales') load();
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, []);
 
   const filtered = clients.filter(c => {
@@ -73,23 +86,12 @@ const Customers = () => {
                         <Button size="sm" variant="outline" onClick={() => navigate('/sales', { state: { clientId: c.id } })}>Vendre</Button>
                         <Button size="sm" variant="ghost" onClick={() => {
                           // open edit modal
-                          // split name into last/first by first space heuristic
                           const [last, first] = (c.name || '').split(/\s+/, 2).concat(['']).slice(0,2);
-                          setForm({ firstName: first || '', lastName: last || '', phone: c.phone || '' });
+                          setForm({ firstName: first || '', lastName: last || '', phone: c.phone || '', discount: c.discount ? String(c.discount) : '', discountType: c.discountType || 'percentage' });
                           setEditingId(c.id);
                           setIsEditing(true);
                         }}>Modifier</Button>
-                        <Button size="sm" variant="destructive" onClick={async () => {
-                          if (!confirm(`Supprimer le client "${c.name}" ? Cette action est irréversible.`)) return;
-                          try {
-                            await db.deleteClient(c.id);
-                            toast({ title: 'Supprimé', description: 'Client supprimé' });
-                            load();
-                          } catch (err) {
-                            console.error('Failed to delete client', err);
-                            toast({ title: 'Erreur', description: 'Impossible de supprimer le client', variant: 'destructive' });
-                          }
-                        }}>Supprimer</Button>
+                        <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(c.id)}>Supprimer</Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -106,7 +108,7 @@ const Customers = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-card p-6 rounded w-[600px]">
             <h3 className="text-lg font-semibold mb-2">{isEditing ? 'Modifier le client' : 'Nouveau client'}</h3>
-            <p className="text-sm text-muted-foreground mb-4">Seuls nom, prénom et téléphone sont requis.</p>
+            <p className="text-sm text-muted-foreground mb-4">Seuls nom, prénom et téléphone sont requis. Vous pouvez aussi définir une remise client (pourcentage ou montant fixe).</p>
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
                 <Label>Nom</Label>
@@ -121,20 +123,33 @@ const Customers = () => {
               <Label>Téléphone</Label>
               <Input placeholder="+229 97 00 00 00" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <div>
+                <Label>Type de remise</Label>
+                <select className="input" value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value as 'percentage' | 'fixed' })}>
+                  <option value="percentage">Pourcentage (%)</option>
+                  <option value="fixed">Montant fixe (FCFA)</option>
+                </select>
+              </div>
+              <div>
+                <Label>Valeur de la remise</Label>
+                <Input type="number" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} placeholder={form.discountType === 'percentage' ? 'Ex: 10' : 'Ex: 5000'} />
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setIsAdding(false); setIsEditing(false); setEditingId(null); setForm({ firstName: '', lastName: '', phone: '' }); }}>Annuler</Button>
+              <Button variant="outline" onClick={() => { setIsAdding(false); setIsEditing(false); setEditingId(null); setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' }); }}>Annuler</Button>
               <Button onClick={async () => {
                 const fullName = `${(form.lastName||'').trim()} ${(form.firstName||'').trim()}`.trim() || 'Client';
                 if (isEditing && editingId) {
                   try {
-                    await db.updateClient(editingId, { name: fullName, phone: form.phone || undefined });
+                    await db.updateClient(editingId, { name: fullName, phone: form.phone || undefined, discount: form.discount ? parseFloat(form.discount) : undefined, discountType: form.discount ? form.discountType : undefined });
                     toast({ title: 'Modifié', description: 'Client modifié' });
                     setIsEditing(false);
                     setEditingId(null);
-                    setForm({ firstName: '', lastName: '', phone: '' });
+                    setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' });
                     load();
                   } catch (err) {
-                    console.error('Failed to update client', err);
+                    logger.error('Failed to update client', err);
                     toast({ title: 'Erreur', description: 'Impossible de modifier le client', variant: 'destructive' });
                   }
                 } else {
@@ -143,15 +158,17 @@ const Customers = () => {
                     name: fullName,
                     contactInfo: '',
                     phone: form.phone || undefined,
+                    discount: form.discount ? parseFloat(form.discount) : undefined,
+                    discountType: form.discount ? form.discountType : undefined,
                   } as Client;
                   try {
                     await db.addClient(client);
                     toast({ title: 'Succès', description: 'Client ajouté' });
                     setIsAdding(false);
-                    setForm({ firstName: '', lastName: '', phone: '' });
+                    setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' });
                     load();
                   } catch (err) {
-                    console.error('Failed to add client', err);
+                    logger.error('Failed to add client', err);
                     toast({ title: 'Erreur', description: 'Impossible d\'ajouter le client', variant: 'destructive' });
                   }
                 }
@@ -160,6 +177,33 @@ const Customers = () => {
           </div>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <div>
+        {/* simple fixed dialog pattern */}
+        {deleteTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-card p-6 rounded w-[420px]">
+              <h3 className="text-lg font-semibold mb-2">Confirmer la suppression</h3>
+              <p className="text-sm text-muted-foreground mb-4">Voulez-vous vraiment supprimer ce client ? Cette action est irréversible.</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDeleteTarget(null)}>Annuler</Button>
+                <Button variant="destructive" onClick={async () => {
+                  try {
+                    await db.deleteClient(deleteTarget);
+                    toast({ title: 'Supprimé', description: 'Client supprimé' });
+                    setDeleteTarget(null);
+                    load();
+                  } catch (err) {
+                    logger.error('Failed to delete client', err);
+                    toast({ title: 'Erreur', description: 'Impossible de supprimer le client', variant: 'destructive' });
+                  }
+                }}>Supprimer</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </PageContainer>
   );
 };

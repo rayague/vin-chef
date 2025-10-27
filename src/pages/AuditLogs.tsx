@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import db from '@/lib/db';
 import { useToast } from '@/components/ui/use-toast';
+import logger from '@/lib/logger';
 import { User } from '@/lib/storage';
 
 const AuditLogs: React.FC = () => {
@@ -16,7 +17,7 @@ const AuditLogs: React.FC = () => {
       setRows(list || []);
       setUsers((u as unknown as User[]) || []);
     } catch (err) {
-      console.error('listAudits error', err);
+      logger.error('listAudits error', err);
       toast({ title: 'Erreur', description: 'Impossible de charger les logs.' });
     } finally {
       setLoading(false);

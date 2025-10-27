@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import logger from '@/lib/logger';
 import { useAuth } from '@/hooks/useAuth';
 import { initializeDemoData } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
@@ -31,18 +32,18 @@ const Login = () => {
       try {
         const raw = localStorage.getItem('winecellar_users') || '[]';
         const users = JSON.parse(raw);
-        console.debug('DEV [auto]: winecellar_users', users);
+  logger.debug('DEV [auto]: winecellar_users', users);
         const admin = (users as unknown[]).find((u) => (u as Record<string, unknown>)?.username === 'admin');
         if (!admin) {
-          console.debug('DEV [auto]: admin user not found');
+          logger.debug('DEV [auto]: admin user not found');
           return;
         }
         const bcrypt = (await import('bcryptjs')) as typeof import('bcryptjs');
         const adminHash = String((admin as Record<string, unknown>).passwordHash || '');
         const ok = await bcrypt.compare('admin123', adminHash);
-        console.debug('DEV [auto]: bcrypt.compare(admin123, admin.hash) =>', ok);
+  logger.debug('DEV [auto]: bcrypt.compare(admin123, admin.hash) =>', ok);
       } catch (err) {
-        console.error('DEV [auto] diagnostic error', err);
+  logger.error('DEV [auto] diagnostic error', err);
       }
     })();
   }, []);
@@ -181,7 +182,7 @@ const Login = () => {
                         initializeDemoData();
                         toast({ title: 'Données de démonstration initialisées', description: 'Vous pouvez vous connecter avec admin/admin123' });
                       } catch (err) {
-                        console.error('reset demo error', err);
+                        logger.error('reset demo error', err);
                         toast({ title: 'Erreur', description: 'Impossible d\'initialiser les données en mode navigateur', variant: 'destructive' });
                       }
                     }}
@@ -199,10 +200,10 @@ const Login = () => {
                     onClick={() => {
                       try {
                         const raw = localStorage.getItem('winecellar_users') || '[]';
-                        console.debug('DEV: winecellar_users', JSON.parse(raw));
+                        debug('DEV: winecellar_users', JSON.parse(raw));
                         toast({ title: 'DEV', description: 'Voir console pour la liste des users' });
                       } catch (err) {
-                        console.error('DEV dump users error', err);
+                        logger.error('DEV dump users error', err);
                         toast({ title: 'DEV', description: 'Erreur lors de la lecture des users (voir console)', variant: 'destructive' });
                       }
                     }}
@@ -219,17 +220,17 @@ const Login = () => {
                         const admin = (users as unknown[]).find((u) => (u as Record<string, unknown>)?.username === 'admin');
                         if (!admin) {
                           toast({ title: 'DEV', description: 'Admin non trouvé', variant: 'destructive' });
-                          console.debug('DEV: admin user not found', users);
+                          debug('DEV: admin user not found', users);
                           return;
                         }
                         // dynamic import bcryptjs to ensure it runs in browser bundle
                         const bcrypt = (await import('bcryptjs')) as typeof import('bcryptjs');
                         const adminHash = String((admin as Record<string, unknown>).passwordHash || '');
                         const ok = await bcrypt.compare('admin123', adminHash);
-                        console.debug('DEV: bcrypt.compare(admin123, admin.hash) =>', ok);
+                        debug('DEV: bcrypt.compare(admin123, admin.hash) =>', ok);
                         toast({ title: 'DEV', description: `bcrypt.compare result: ${ok}` });
                       } catch (err) {
-                        console.error('DEV test bcrypt error', err);
+                        logger.error('DEV test bcrypt error', err);
                         toast({ title: 'DEV', description: 'Erreur lors du test bcrypt (voir console)', variant: 'destructive' });
                       }
                     }}

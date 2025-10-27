@@ -24,6 +24,8 @@ export interface Client {
   phone?: string;
   address?: string;
   ifu?: string;
+  discount?: number; // Montant ou pourcentage selon discountType
+  discountType?: 'percentage' | 'fixed';
 }
 
 export interface Sale {
