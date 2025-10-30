@@ -142,13 +142,27 @@ const Categories = () => {
                 </Button>
               )}
               {user?.role === 'admin' && (
+                <Button variant="outline" onClick={async () => {
+                  try {
+                    await db.resetDemoData();
+                    toast({ title: 'Succès', description: 'Données de démonstration réinitialisées' });
+                    load();
+                  } catch (err) {
+                    logger.error('reset demo data failed', err);
+                    toast({ title: 'Erreur', description: 'Impossible de réinitialiser les données', variant: 'destructive' });
+                  }
+                }}>
+                  Réinitialiser démo
+                </Button>
+              )}
+              {user?.role === 'admin' && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button onClick={() => { resetForm(); setEditing(null); }}>
                       <Plus className="w-4 h-4 mr-2" /> Nouvelle catégorie
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>{editing ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</DialogTitle>
                     </DialogHeader>

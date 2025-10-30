@@ -167,7 +167,7 @@ const Products = () => {
                         Nouveau Produit
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-2xl">
                       <DialogHeader>
                         <DialogTitle>{editingProduct ? 'Modifier le produit' : 'Nouveau produit'}</DialogTitle>
                       </DialogHeader>

@@ -40,6 +40,14 @@ export interface Sale {
   createdBy?: string;
   discount?: number; // Montant de la remise
   discountType?: 'percentage' | 'fixed'; // Type de remise: pourcentage ou montant fixe
+  // Optional items for multi-product sales (new feature)
+  items?: {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    discount?: number; // amount
+    discountType?: 'percentage' | 'fixed';
+  }[];
 }
 
 export interface Invoice {
@@ -258,12 +266,21 @@ export const initializeDemoData = (force: boolean = false) => {
     },
   ];
 
+  // Demo categories
+  const demoCategories: Category[] = [
+    { id: 'cat-1', name: 'Bordeaux Rouge', description: 'Vins rouges de Bordeaux' },
+    { id: 'cat-2', name: 'Bourgogne Blanc', description: 'Vins blancs de Bourgogne' },
+    { id: 'cat-3', name: 'Champagne', description: 'Champagnes et mousseux' },
+  ];
+
+
   // Save demo data
   storage.set(STORAGE_KEYS.USERS, demoUsers);
   storage.set(STORAGE_KEYS.PRODUCTS, demoProducts);
   storage.set(STORAGE_KEYS.CLIENTS, demoClients);
   storage.set(STORAGE_KEYS.SALES, []);
   storage.set(STORAGE_KEYS.INVOICES, []);
+  storage.set(STORAGE_KEYS.CATEGORIES, demoCategories);
 };
 
 // Stock movements

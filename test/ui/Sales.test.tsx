@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 import { vi, describe, it, expect } from 'vitest';
 import '@testing-library/jest-dom';
@@ -9,16 +10,22 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 vi.mock('@/lib/db', () => ({
-  getSales: async () => [],
-  getProducts: async () => [{ id: 'p1', name: 'Test', unitPrice: 100, stockQuantity: 10 }],
-  getClients: async () => [{ id: 'c1', name: 'Client A' }],
-  getUsers: async () => [{ id: '1', username: 'admin' }],
+  default: {
+    getSales: async () => [],
+    getProducts: async () => [{ id: 'p1', name: 'Test', unitPrice: 100, stockQuantity: 10 }],
+    getClients: async () => [{ id: 'c1', name: 'Client A' }],
+    getUsers: async () => [{ id: '1', username: 'admin' }],
+  }
 }));
 
 describe('Sales UI', () => {
   it('renders sales page and shows New Sale button', async () => {
     const Sales = (await import('../../src/pages/Sales')).default;
-    render(<Sales /> as unknown as React.ReactElement);
+    render(
+      <MemoryRouter>
+        <Sales />
+      </MemoryRouter> as unknown as React.ReactElement
+    );
     await waitFor(() => expect(screen.getByText(/Nouvelle Vente/i)).toBeInTheDocument());
   });
 });

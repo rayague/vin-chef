@@ -10,9 +10,12 @@ export interface InvoiceData {
   clientAddress?: string;
   clientPhone?: string;
   clientIFU?: string;
-  productName: string;
-  quantity: number;
-  unitPrice: number; // prix unitaire HT
+  // Single-product fields (kept for backward compatibility)
+  productName?: string;
+  quantity?: number;
+  unitPrice?: number; // prix unitaire HT
+  // Multi-item support
+  items?: { description: string; quantity: number; unitPrice: number; discount?: number }[];
   tvaRate?: number; // ex: 18 for 18%
   totalHT: number;
   tva: number;
@@ -111,6 +114,24 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
 
   const tvaRate = data.tvaRate ?? 18;
 
+  // Build table rows from items or single-product fields
+  const rows: Array<Array<string>> = [];
+  if (data.items && data.items.length > 0) {
+    data.items.forEach(item => {
+      const lineTotal = item.unitPrice * item.quantity - (item.discount || 0);
+      rows.push([item.description, String(item.quantity), formatCurrency(item.unitPrice), formatCurrency(lineTotal), `${tvaRate}%`, formatCurrency((lineTotal * tvaRate) / 100)]);
+    });
+  } else {
+    rows.push([
+      data.productName || '-',
+      String(data.quantity || 0),
+      formatCurrency(data.unitPrice || 0),
+      formatCurrency(data.totalHT),
+      `${tvaRate}%`,
+      formatCurrency(data.tva),
+    ]);
+  }
+
   autoTable(doc, {
     startY: tableStartY,
     head: [[
@@ -121,16 +142,9 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       { content: 'TVA %', styles: { halign: 'right' } },
       { content: 'Montant TVA (FCFA)', styles: { halign: 'right' } },
     ]],
-    body: [[
-      data.productName,
-      String(data.quantity),
-  formatCurrency(data.unitPrice),
-  formatCurrency(data.totalHT),
-      `${tvaRate}%`,
-      formatCurrency(data.tva),
-    ]],
+    body: rows,
     theme: 'grid',
-  headStyles: { fillColor: [accent[0], accent[1], accent[2]] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold' },
+    headStyles: { fillColor: [accent[0], accent[1], accent[2]] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold' },
     styles: { fontSize: 9 },
     columnStyles: {
       0: { cellWidth: 70 },

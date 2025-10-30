@@ -33,12 +33,12 @@ const Sales = () => {
   const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    productId: '',
     clientId: '',
-    quantity: '',
-    discount: '',
-    discountType: 'percentage' as 'percentage' | 'fixed',
   });
+
+  const [items, setItems] = useState<Array<{ productId: string; quantity: string; discount: string; discountType: 'percentage' | 'fixed' }>>([
+    { productId: '', quantity: '1', discount: '', discountType: 'percentage' },
+  ]);
 
   const location = useLocation();
 
@@ -84,63 +84,83 @@ const Sales = () => {
     if (!formData.clientId) return;
     const client = clients.find(c => c.id === formData.clientId);
     if (!client) return;
-    // the client may have discount/discountType saved
     const anyClient = client as unknown as { discount?: number; discountType?: 'percentage' | 'fixed' };
+    // If client has a default discount, apply it to every existing item as a suggested value
     if (anyClient.discount !== undefined && anyClient.discount !== null) {
-      setFormData(prev => ({ ...prev, discount: String(anyClient.discount), discountType: anyClient.discountType || 'percentage' }));
+      setItems(prev => prev.map(it => ({ ...it, discount: String(anyClient.discount), discountType: anyClient.discountType || 'percentage' })));
     }
   }, [formData.clientId, clients]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.productId || !formData.clientId || !formData.quantity) {
-      toast({ title: 'Erreur', description: 'Veuillez remplir tous les champs', variant: 'destructive' });
+    // Validate basic client and items
+    if (!formData.clientId) {
+      toast({ title: 'Erreur', description: 'Veuillez sélectionner un client', variant: 'destructive' });
+      return;
+    }
+    const client = clients.find(c => c.id === formData.clientId);
+    if (!client) return;
+
+    // Validate items
+    const validItems = items.filter(it => it.productId && parseInt(it.quantity) > 0);
+    if (validItems.length === 0) {
+      toast({ title: 'Erreur', description: 'Veuillez ajouter au moins un produit', variant: 'destructive' });
       return;
     }
 
-    const product = products.find(p => p.id === formData.productId);
-    const client = clients.find(c => c.id === formData.clientId);
-    const quantity = parseInt(formData.quantity);
-
-    if (!product || !client) return;
-
-    if (product.stockQuantity < quantity) {
-      toast({ title: 'Erreur', description: 'Stock insuffisant', variant: 'destructive' });
-      return;
+    // Check stock for each
+    for (const it of validItems) {
+      const prod = products.find(p => p.id === it.productId);
+      const q = parseInt(it.quantity);
+      if (!prod) {
+        toast({ title: 'Erreur', description: 'Produit introuvable', variant: 'destructive' });
+        return;
+      }
+      if (prod.stockQuantity < q) {
+        toast({ title: 'Erreur', description: `Stock insuffisant pour ${prod.name}`, variant: 'destructive' });
+        return;
+      }
     }
 
     const invoiceNumber = await db.getNextInvoiceNumber();
-    const totalHT = product.unitPrice * quantity;
-    
-    // Calcul de la remise
-    const discountValue = parseFloat(formData.discount) || 0;
-    let discountAmount = 0;
-    if (discountValue > 0) {
-      if (formData.discountType === 'percentage') {
-        discountAmount = (totalHT * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
+    // compute totals
+    let totalHT = 0;
+    let totalDiscount = 0;
+    const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }> = [];
+    validItems.forEach(it => {
+      const prod = products.find(p => p.id === it.productId)!;
+      const q = parseInt(it.quantity);
+      const unit = prod.unitPrice;
+      let discountAmount = 0;
+      const d = parseFloat(it.discount) || 0;
+      if (d > 0) {
+        if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
+        else discountAmount = d;
       }
-    }
-    
-    const totalHTAfterDiscount = totalHT - discountAmount;
-    const tva = totalHTAfterDiscount * 0.18;
-    const totalTTC = totalHTAfterDiscount + tva;
+      const lineTotalHT = unit * q - discountAmount;
+      totalHT += lineTotalHT;
+      totalDiscount += discountAmount;
+      itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, discount: discountAmount > 0 ? discountAmount : undefined });
+    });
+
+    const tva = totalHT * 0.18;
+    const totalTTC = totalHT + tva;
 
     const saleData: Sale = {
       id: Date.now().toString(),
-      productId: formData.productId,
+      productId: validItems[0].productId,
       clientId: formData.clientId,
-      quantity,
-      unitPrice: product.unitPrice,
+      quantity: validItems.reduce((s, it) => s + parseInt(it.quantity), 0),
+      unitPrice: validItems[0] ? (products.find(p => p.id === validItems[0].productId)?.unitPrice || 0) : 0,
       totalPrice: totalTTC,
       date: new Date().toISOString(),
       invoiceNumber,
       createdBy: user?.id,
-      discount: discountAmount > 0 ? discountAmount : undefined,
-      discountType: discountAmount > 0 ? formData.discountType : undefined,
-    };
+      discount: totalDiscount > 0 ? totalDiscount : undefined,
+      discountType: totalDiscount > 0 ? 'fixed' : undefined,
+      items: validItems.map(it => ({ productId: it.productId, quantity: parseInt(it.quantity), unitPrice: products.find(p => p.id === it.productId)!.unitPrice, discount: parseFloat(it.discount) || undefined, discountType: it.discountType })),
+    } as Sale;
 
     setSaving(true);
     try {
@@ -152,18 +172,19 @@ const Sales = () => {
           invoiceNumber,
           date: saleData.date,
           clientSnapshot: JSON.stringify(client),
-          productSnapshot: JSON.stringify(product),
+          // for backward compatibility include single product snapshot as first product, and include items array
+          productSnapshot: JSON.stringify(itemsPayload.length === 1 ? itemsPayload[0] : itemsPayload),
           totalPrice: totalTTC,
           tva,
-            ifu: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
-            tvaRate: 18,
+          ifu: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
+          tvaRate: 18,
           immutableFlag: 1,
           createdBy: user?.id,
+          discount: totalDiscount > 0 ? totalDiscount : undefined,
         };
         await db.createSaleWithInvoice(saleData, invoicePayload as unknown as Invoice);
       } else {
         await db.addSale(saleData);
-        await db.updateProduct(product.id, { stockQuantity: product.stockQuantity - quantity });
         await db.addInvoice({
           id: Date.now().toString(),
           saleId: saleData.id,
@@ -171,15 +192,15 @@ const Sales = () => {
           date: saleData.date,
           clientName: client.name,
           clientIFU: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
-          productName: product.name,
-          quantity,
-          unitPrice: product.unitPrice,
+          productName: itemsPayload.length === 1 ? itemsPayload[0].description : 'Multiple produits',
+          quantity: saleData.quantity,
+          unitPrice: saleData.unitPrice,
           totalPrice: totalTTC,
           tva,
           tvaRate: 18,
           createdBy: user?.id,
-          discount: discountAmount > 0 ? discountAmount : undefined,
-          discountType: discountAmount > 0 ? formData.discountType : undefined,
+          discount: totalDiscount > 0 ? totalDiscount : undefined,
+          discountType: totalDiscount > 0 ? 'fixed' : undefined,
         });
       }
     } catch (err) {
@@ -191,32 +212,16 @@ const Sales = () => {
       setSaving(false);
     }
 
-    const pdf = generateInvoicePDF({
-      invoiceNumber,
-      date: saleData.date,
-      clientName: client.name,
-      clientAddress: client.address,
-      clientPhone: client.phone,
-      productName: product.name,
-      quantity,
-      unitPrice: product.unitPrice,
-      totalHT,
-      tva,
-      totalTTC,
-      discount: discountAmount,
-      discountType: formData.discountType,
-    });
-
-    downloadInvoice(invoiceNumber, pdf);
-
-  toast({ title: 'Succès', description: 'Vente enregistrée et facture générée' });
+    // Disabled automatic invoice download per user request. Invoice is saved and available in the Invoices page.
+    toast({ title: 'Succès', description: 'Vente enregistrée' });
     setIsDialogOpen(false);
     resetForm();
     loadData();
   };
 
   const resetForm = () => {
-    setFormData({ productId: '', clientId: '', quantity: '', discount: '', discountType: 'percentage' });
+    setFormData({ clientId: '' });
+    setItems([{ productId: '', quantity: '1', discount: '', discountType: 'percentage' }]);
   };
 
   return (
@@ -238,7 +243,7 @@ const Sales = () => {
                     Nouvelle Vente
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-3xl">
                   <DialogHeader>
                     <DialogTitle>Enregistrer une vente</DialogTitle>
                   </DialogHeader>
@@ -259,79 +264,88 @@ const Sales = () => {
                             </Select>
                           </div>
                           <div className="pt-6">
-                            <Button size="sm" variant="outline" onClick={() => setIsClientDialogOpen(true)}>Ajouter client</Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => setIsClientDialogOpen(true)}>Ajouter client</Button>
                           </div>
                         </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Produit *</Label>
-                      <Select value={formData.productId} onValueChange={(value) => setFormData({ ...formData, productId: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner un produit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map(product => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} - Stock: {product.stockQuantity}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Produits *</Label>
+                      <div className="space-y-2">
+                        {items.map((it, idx) => (
+                          <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                            <div className="col-span-5">
+                              <Label className="text-xs">Produit</Label>
+                              <Select value={it.productId} onValueChange={(value) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, productId: value } : p))}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner un produit" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {products.map(product => (
+                                    <SelectItem key={product.id} value={product.id}>{product.name} - Stock: {product.stockQuantity}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Quantité</Label>
+                              <Input type="number" min="1" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Type Remise</Label>
+                              <Select value={it.discountType} onValueChange={(value: 'percentage' | 'fixed') => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discountType: value } : p))}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="percentage">%</SelectItem>
+                                  <SelectItem value="fixed">FCFA</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Valeur Remise</Label>
+                              <Input type="number" min="0" value={it.discount} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discount: e.target.value } : p))} />
+                            </div>
+                            <div className="col-span-1">
+                              <Label className="text-xs"> </Label>
+                              <div className="flex gap-1">
+                                <Button type="button" variant="ghost" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>Suppr</Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        <div>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Quantité *</Label>
-                      <Input type="number" min="1" value={formData.quantity} onChange={(e) => setFormData({ ...formData, quantity: e.target.value })} />
-                    </div>
-                    
-                    {/* Section Remise */}
+
+                    {/* Totals preview */}
                     <div className="border-t pt-4 space-y-3">
                       <div className="flex items-center gap-2">
-                        <Label className="text-sm font-semibold">Remise (optionnelle)</Label>
+                        <Label className="text-sm font-semibold">Récapitulatif</Label>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-2">
-                          <Label>Type de remise</Label>
-                          <Select value={formData.discountType} onValueChange={(value: 'percentage' | 'fixed') => setFormData({ ...formData, discountType: value })}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="percentage">Pourcentage (%)</SelectItem>
-                              <SelectItem value="fixed">Montant fixe (FCFA)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Valeur</Label>
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            step={formData.discountType === 'percentage' ? '0.1' : '1'}
-                            max={formData.discountType === 'percentage' ? '100' : undefined}
-                            value={formData.discount} 
-                            onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                            placeholder={formData.discountType === 'percentage' ? 'Ex: 10' : 'Ex: 5000'}
-                          />
-                        </div>
-                      </div>
-                      {formData.discount && formData.quantity && formData.productId && (() => {
-                        const product = products.find(p => p.id === formData.productId);
-                        if (!product) return null;
-                        const quantity = parseInt(formData.quantity);
-                        const totalHT = product.unitPrice * quantity;
-                        const discountValue = parseFloat(formData.discount) || 0;
-                        let discountAmount = 0;
-                        if (discountValue > 0) {
-                          if (formData.discountType === 'percentage') {
-                            discountAmount = (totalHT * discountValue) / 100;
-                          } else {
-                            discountAmount = discountValue;
+                      {(() => {
+                        const validItems = items.filter(it => it.productId && parseInt(it.quantity) > 0);
+                        if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
+                        let totalHT = 0;
+                        let totalDiscount = 0;
+                        validItems.forEach(it => {
+                          const prod = products.find(p => p.id === it.productId);
+                          if (!prod) return;
+                          const q = parseInt(it.quantity);
+                          const unit = prod.unitPrice;
+                          const d = parseFloat(it.discount) || 0;
+                          let discountAmount = 0;
+                          if (d > 0) {
+                            if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
+                            else discountAmount = d;
                           }
-                        }
-                        const totalHTAfterDiscount = totalHT - discountAmount;
-                        const tva = totalHTAfterDiscount * 0.18;
-                        const totalTTC = totalHTAfterDiscount + tva;
-                        
+                          totalHT += unit * q - discountAmount;
+                          totalDiscount += discountAmount;
+                        });
+                        const tva = totalHT * 0.18;
+                        const totalTTC = totalHT + tva;
                         return (
                           <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
                             <div className="flex justify-between">
@@ -339,12 +353,8 @@ const Sales = () => {
                               <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
                             </div>
                             <div className="flex justify-between text-destructive">
-                              <span>Remise:</span>
-                              <span className="font-medium">- {discountAmount.toLocaleString('fr-FR')} FCFA</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Total HT après remise:</span>
-                              <span className="font-medium">{totalHTAfterDiscount.toLocaleString('fr-FR')} FCFA</span>
+                              <span>Remise totale:</span>
+                              <span className="font-medium">- {totalDiscount.toLocaleString('fr-FR')} FCFA</span>
                             </div>
                             <div className="flex justify-between">
                               <span>TVA (18%):</span>
@@ -434,6 +444,7 @@ const Sales = () => {
                     <TableHead>Client</TableHead>
                     <TableHead>Produit</TableHead>
                     <TableHead>Quantité</TableHead>
+                    <TableHead>Remise</TableHead>
                     <TableHead>Montant</TableHead>
                     {user?.role === 'admin' && <TableHead>Opérateur</TableHead>}
                   </TableRow>
@@ -448,8 +459,33 @@ const Sales = () => {
                         <TableCell className="font-mono">{sale.invoiceNumber}</TableCell>
                         <TableCell>{format(new Date(sale.date), 'dd/MM/yyyy', { locale: fr })}</TableCell>
                         <TableCell>{client?.name}</TableCell>
-                        <TableCell>{product?.name}</TableCell>
+                        <TableCell>{(sale.items && sale.items.length > 1) ? 'Multiple produits' : (product?.name || (sale.items && sale.items[0]?.productId) || '—')}</TableCell>
                         <TableCell>{sale.quantity}</TableCell>
+                        <TableCell>{(() => {
+                          // Prefer per-item discounts when available
+                          if (sale.items && sale.items.length) {
+                            const itemsWithDiscount = (sale.items || []).filter(it => it.discount !== undefined && it.discount !== null);
+                            if (itemsWithDiscount.length === 0) return '-';
+                            const allPercent = itemsWithDiscount.every(it => it.discountType === 'percentage');
+                            const allFixed = itemsWithDiscount.every(it => it.discountType === 'fixed');
+                            if (allPercent) {
+                              const vals = itemsWithDiscount.map(it => Number(it.discount));
+                              const first = vals[0];
+                              const allSame = vals.every(v => v === first);
+                              return allSame ? `${first}%` : 'Mix %';
+                            }
+                            if (allFixed) {
+                              const sum = itemsWithDiscount.reduce((s, it) => s + Number(it.discount || 0), 0);
+                              return `${sum.toLocaleString('fr-FR')} FCFA`;
+                            }
+                            return 'Mix';
+                          }
+                          // Fallback to sale-level discount
+                          if (sale.discount) {
+                            return sale.discountType === 'percentage' ? `${sale.discount}%` : `${Number(sale.discount).toLocaleString('fr-FR')} FCFA`;
+                          }
+                          return '-';
+                        })()}</TableCell>
                         <TableCell className="font-semibold">{sale.totalPrice.toLocaleString('fr-FR')} FCFA</TableCell>
                         {user?.role === 'admin' && (
                           <TableCell>{operator ? operator.username : '-'}</TableCell>

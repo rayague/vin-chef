@@ -202,7 +202,7 @@ const UsersPage = () => {
                       </Button>
                     </DialogTrigger>
                   ) : null}
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-2xl">
                     <DialogHeader>
                       <DialogTitle>{editingUser ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur'}</DialogTitle>
                     </DialogHeader>

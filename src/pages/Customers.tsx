@@ -71,9 +71,10 @@ const Customers = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Téléphone</TableHead>
-                  <TableHead>Actions</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Téléphone</TableHead>
+                    <TableHead>Remise</TableHead>
+                    <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -81,6 +82,10 @@ const Customers = () => {
                   <TableRow key={c.id}>
                     <TableCell>{c.name}</TableCell>
                     <TableCell>{c.phone || '-'}</TableCell>
+                      <TableCell>{(() => {
+                        if (c.discount === undefined || c.discount === null) return '-';
+                        return c.discountType === 'percentage' ? `${c.discount}%` : `${Number(c.discount).toLocaleString('fr-FR')} FCFA`;
+                      })()}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => navigate('/sales', { state: { clientId: c.id } })}>Vendre</Button>
@@ -106,7 +111,7 @@ const Customers = () => {
 
       {(isAdding || isEditing) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-card p-6 rounded w-[600px]">
+          <div className="bg-card p-6 rounded w-[900px] max-w-[95%]">
             <h3 className="text-lg font-semibold mb-2">{isEditing ? 'Modifier le client' : 'Nouveau client'}</h3>
             <p className="text-sm text-muted-foreground mb-4">Seuls nom, prénom et téléphone sont requis. Vous pouvez aussi définir une remise client (pourcentage ou montant fixe).</p>
             <div className="grid grid-cols-2 gap-3 mb-4">

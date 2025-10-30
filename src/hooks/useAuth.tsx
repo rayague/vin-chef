@@ -133,6 +133,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     setCurrentUser(null);
+    // Notify other listeners (pages/components) that auth changed and force navigation to login.
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vinchef:auth-changed', { detail: { loggedOut: true } }));
+        // Ensure UI resets; navigate to login page to avoid stale state on pages that don't consume auth context properly
+        window.location.href = '/login';
+      }
+    } catch (e) {
+      // ignore errors during logout navigation
+    }
   };
 
   const isAdmin = user?.role === 'admin';

@@ -303,10 +303,21 @@ export const db = {
         // Also decrement product stock in storage fallback so getProducts() sees the change
         try {
           const prods = storageGetProducts();
-          const p = prods.find((x: unknown) => (x as import('./storage').Product).id === sale.productId) as import('./storage').Product | undefined;
-          if (p) {
-            const newQty = (p.stockQuantity ?? 0) - sale.quantity;
-            storageUpdateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
+          // If sale contains multiple items, decrement each product accordingly
+          if ((sale as unknown as { items?: Array<{ productId: string; quantity: number }> }).items && (sale as unknown as { items?: Array<{ productId: string; quantity: number }> }).items!.length > 0) {
+            for (const it of (sale as unknown as { items?: Array<{ productId: string; quantity: number }> }).items || []) {
+              const p = prods.find((x: unknown) => (x as import('./storage').Product).id === it.productId) as import('./storage').Product | undefined;
+              if (p) {
+                const newQty = (p.stockQuantity ?? 0) - (it.quantity ?? 0);
+                storageUpdateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
+              }
+            }
+          } else {
+            const p = prods.find((x: unknown) => (x as import('./storage').Product).id === sale.productId) as import('./storage').Product | undefined;
+            if (p) {
+              const newQty = (p.stockQuantity ?? 0) - sale.quantity;
+              storageUpdateProduct(p.id, { stockQuantity: newQty } as Partial<import('./storage').Product>);
+            }
           }
         } catch (err) {
           // ignore
@@ -316,11 +327,28 @@ export const db = {
       }
       // decrement product stock in idb if present
         try {
-          const prod = await idb.idbGet<StorageProduct>('products', sale.productId);
-          if (prod) {
-            prod.stockQuantity = (prod.stockQuantity || 0) - sale.quantity;
-            await idb.idbPut('products', prod);
-            emitChange({ entity: 'products', action: 'update', id: prod.id });
+          // If sale contains multiple items, decrement each product in IndexedDB
+          const itemsArr = (sale as unknown as { items?: Array<{ productId: string; quantity: number }> }).items;
+          if (itemsArr && itemsArr.length > 0) {
+            for (const it of itemsArr) {
+              try {
+                const prod = await idb.idbGet<StorageProduct>('products', it.productId);
+                if (prod) {
+                  prod.stockQuantity = (prod.stockQuantity || 0) - (it.quantity || 0);
+                  await idb.idbPut('products', prod);
+                  emitChange({ entity: 'products', action: 'update', id: prod.id });
+                }
+              } catch (err) {
+                // ignore per-item
+              }
+            }
+          } else {
+            const prod = await idb.idbGet<StorageProduct>('products', sale.productId);
+            if (prod) {
+              prod.stockQuantity = (prod.stockQuantity || 0) - sale.quantity;
+              await idb.idbPut('products', prod);
+              emitChange({ entity: 'products', action: 'update', id: prod.id });
+            }
           }
         } catch (err) {
           // ignore
@@ -600,6 +628,36 @@ export const db = {
       return [];
     }
 
+  },
+
+  async addStockMovement(movement: import('./storage').StockMovement) {
+    if (isElectronDBAvailable()) {
+      const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
+      if (api && typeof api.addStockMovement === 'function') {
+        const res = await api.addStockMovement(movement);
+        try {
+          if (typeof api.addAudit === 'function') await api.addAudit('create', 'stock_movement', movement.id, (movement as unknown as import('./storage').StockMovement).createdBy || undefined, { movement });
+        } catch (err) {
+          logger.error('Failed to write audit (addStockMovement electron)', err);
+        }
+        return res;
+      }
+    }
+    // Fallback: try IndexedDB first
+    try {
+      await idb.idbPut('stock_movements', movement);
+      emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
+      try {
+        if (typeof storageAddStockMovement === 'function') storageAddStockMovement(movement as unknown as import('./storage').StockMovement);
+      } catch (err) {
+        // ignore
+      }
+      return movement;
+    } catch (e) {
+      const res = storageAddStockMovement(movement as unknown as import('./storage').StockMovement);
+      emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
+      return res;
+    }
   },
 
   // Reset demo data (desktop only in preload) - fallback: reinitialize localStorage demo data
