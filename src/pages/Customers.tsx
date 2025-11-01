@@ -4,6 +4,7 @@ import PageContainer from '@/components/PageContainer';
 import PageHeader from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,6 +18,7 @@ const Customers = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -79,14 +81,22 @@ const Customers = () => {
               </TableHeader>
               <TableBody>
                 {filtered.map(c => (
-                  <TableRow key={c.id}>
+                  <TableRow key={c.id} className={c.id === highlightedId ? 'bg-yellow-100' : undefined}>
                     <TableCell>{c.name}</TableCell>
                     <TableCell>{c.phone || '-'}</TableCell>
-                      <TableCell>{(() => {
-                        if (c.discount === undefined || c.discount === null) return '-';
-                        return c.discountType === 'percentage' ? `${c.discount}%` : `${Number(c.discount).toLocaleString('fr-FR')} FCFA`;
-                      })()}</TableCell>
-                    <TableCell>
+                      <TableCell>
+                        {(() => {
+                          if (c.discount === undefined || c.discount === null) return <span className="text-muted-foreground">-</span>;
+                          const label = c.discountType === 'percentage' ? `${c.discount}%` : `${Number(c.discount).toLocaleString('fr-FR')} FCFA`;
+                          return (
+                            <div className="flex items-center gap-3">
+                              <Badge variant="secondary">{label}</Badge>
+                              <span className="text-sm font-medium">{label}</span>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                        <TableCell>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={() => navigate('/sales', { state: { clientId: c.id } })}>Vendre</Button>
                         <Button size="sm" variant="ghost" onClick={() => {
@@ -98,7 +108,7 @@ const Customers = () => {
                         }}>Modifier</Button>
                         <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(c.id)}>Supprimer</Button>
                       </div>
-                    </TableCell>
+                        </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -147,11 +157,20 @@ const Customers = () => {
                 const fullName = `${(form.lastName||'').trim()} ${(form.firstName||'').trim()}`.trim() || 'Client';
                 if (isEditing && editingId) {
                   try {
-                    await db.updateClient(editingId, { name: fullName, phone: form.phone || undefined, discount: form.discount ? parseFloat(form.discount) : undefined, discountType: form.discount ? form.discountType : undefined });
+                    const updated = await db.updateClient(editingId, { name: fullName, phone: form.phone || undefined, discount: form.discount ? parseFloat(form.discount) : undefined, discountType: form.discount ? form.discountType : undefined });
+                    // Immediately update local state so UI reflects changes even if underlying storage is slow
+                    if (updated) {
+                      setClients(prev => (prev || []).map(c => c.id === editingId ? (updated as Client) : c));
+                      // debug log and highlight the updated row briefly
+                      console.log('Client updated (local):', updated);
+                      setHighlightedId(editingId);
+                      setTimeout(() => setHighlightedId(null), 2000);
+                    }
                     toast({ title: 'Modifié', description: 'Client modifié' });
                     setIsEditing(false);
                     setEditingId(null);
                     setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' });
+                    // Reload to ensure persistence sources are in sync
                     load();
                   } catch (err) {
                     logger.error('Failed to update client', err);
