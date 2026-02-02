@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import db from '@/lib/db';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Package, Users, TrendingUp, FileText, LogOut, Wine } from 'lucide-react';
+import { Package, Users, TrendingUp, FileText, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import PageContainer from '@/components/PageContainer';
 import { fr } from 'date-fns/locale';
@@ -101,7 +101,7 @@ const Dashboard = () => {
       <div className="bg-primary text-primary-foreground shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <Wine className="w-8 h-8" />
+            <img src="/logo_vin.jpeg" className="w-10 h-10 object-contain rounded-full" alt="Logo" />
             <div>
               <h1 className="text-2xl font-bold">Cave Premium Wines</h1>
               <p className="text-sm opacity-90">Système de gestion</p>

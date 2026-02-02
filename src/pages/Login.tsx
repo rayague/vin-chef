@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Wine } from 'lucide-react';
 import { useEffect } from 'react';
 
 const Login = () => {
@@ -93,9 +92,7 @@ const Login = () => {
         <Card className="overflow-visible shadow-xl">
           <CardHeader className="space-y-2 text-center pt-6">
             <div className="flex justify-center -mt-12">
-              <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center ring-4 ring-white/80 dark:ring-black/60 motion-safe-animate">
-                <Wine className="w-10 h-10 text-primary-foreground" aria-hidden />
-              </div>
+              <img src="/logo_vin.jpeg" className="w-16 h-16 object-contain rounded-full ring-4 ring-white/80 dark:ring-black/60 motion-safe-animate" alt="Logo" />
             </div>
             <div>
               <CardTitle id="login-title" className="text-2xl sm:text-3xl font-extrabold">Cave Premium Wines</CardTitle>
