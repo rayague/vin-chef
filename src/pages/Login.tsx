@@ -84,15 +84,17 @@ const Login = () => {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-6">
+    <main className="min-h-screen relative flex items-center justify-center bg-background p-6 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_circle_at_20%_10%,hsl(var(--primary)/0.22),transparent_55%),radial-gradient(700px_circle_at_80%_70%,hsl(var(--sidebar-background)/0.18),transparent_60%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-background via-background to-muted/40" />
       <section
         aria-labelledby="login-title"
-        className="w-full max-w-xl p-6 motion-safe-slide-up"
+        className="relative z-10 w-full max-w-xl p-6 motion-safe-slide-up"
       >
         <Card className="overflow-visible shadow-xl">
           <CardHeader className="space-y-2 text-center pt-6">
             <div className="flex justify-center -mt-12">
-              <img src="/logo_vin.jpeg" className="w-16 h-16 object-contain rounded-full ring-4 ring-white/80 dark:ring-black/60 motion-safe-animate" alt="Logo" />
+              <img src="/logo_vin.jpeg" className="w-16 h-16 object-contain rounded-full ring-4 ring-background motion-safe-animate" alt="Logo" />
             </div>
             <div>
               <CardTitle id="login-title" className="text-2xl sm:text-3xl font-extrabold">Cave Premium Wines</CardTitle>

@@ -7,11 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Sale, Product, Client, Invoice } from '@/lib/storage';
 import db from '@/lib/db';
 import logger from '@/lib/logger';
-import { generateInvoicePDF, downloadInvoice } from '@/lib/pdf';
-import { Plus, ArrowLeft, TrendingUp, Download } from 'lucide-react';
+import emcf, { EmcfPointOfSaleSummary } from '@/lib/emcf';
+import { Plus, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
@@ -31,6 +33,24 @@ const Sales = () => {
   const [clientForm, setClientForm] = useState({ firstName: '', lastName: '', phone: '' });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [normalizeWithEmcf, setNormalizeWithEmcf] = useState(false);
+  const [emcfActivePos, setEmcfActivePos] = useState<EmcfPointOfSaleSummary | null>(null);
+
+  const [emcfPending, setEmcfPending] = useState<null | {
+    uid: string;
+    submittedAt: string;
+    expiresAtMs: number;
+    posId: string;
+    statusResponse: unknown;
+    invoiceResponse: unknown;
+    client: Client;
+    validItems: Array<{ productId: string; quantity: number; discount?: number; discountType: 'percentage' | 'fixed' }>;
+    itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
+    totals: { totalHT: number; tva: number; totalTTC: number; totalDiscount: number };
+    emcfPayload: unknown;
+  }>(null);
+  const [emcfSecondsLeft, setEmcfSecondsLeft] = useState<number>(0);
 
   const [formData, setFormData] = useState({
     clientId: '',
@@ -59,6 +79,19 @@ const Sales = () => {
     }
     loadData();
 
+    (async () => {
+      try {
+        if (!emcf.isAvailable()) {
+          setEmcfActivePos(null);
+          return;
+        }
+        const pos = await emcf.getActivePointOfSale();
+        setEmcfActivePos(pos);
+      } catch (err) {
+        setEmcfActivePos(null);
+      }
+    })();
+
     // If navigated with a clientId in state, prefill and open the dialog
     const state = (location && (location as unknown as { state?: { clientId?: string } }).state) || undefined;
     const clientIdFromState = state?.clientId;
@@ -78,6 +111,20 @@ const Sales = () => {
     window.addEventListener('vinchef:data-changed', handler as EventListener);
     return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate, location, loadData]);
+
+  useEffect(() => {
+    if (!emcfPending) {
+      setEmcfSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((emcfPending.expiresAtMs - Date.now()) / 1000));
+      setEmcfSecondsLeft(left);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [emcfPending]);
 
   // Auto-fill discount when client selection changes
   useEffect(() => {
@@ -123,11 +170,11 @@ const Sales = () => {
       }
     }
 
-    const invoiceNumber = await db.getNextInvoiceNumber();
     // compute totals
     let totalHT = 0;
     let totalDiscount = 0;
     const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }> = [];
+    const normalizedItems: Array<{ productId: string; quantity: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
     validItems.forEach(it => {
       const prod = products.find(p => p.id === it.productId)!;
       const q = parseInt(it.quantity);
@@ -142,10 +189,106 @@ const Sales = () => {
       totalHT += lineTotalHT;
       totalDiscount += discountAmount;
       itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, discount: discountAmount > 0 ? discountAmount : undefined });
+      normalizedItems.push({ productId: it.productId, quantity: q, discount: d > 0 ? d : undefined, discountType: it.discountType });
     });
 
     const tva = totalHT * 0.18;
     const totalTTC = totalHT + tva;
+
+    const shouldUseEmcf = normalizeWithEmcf && emcf.isAvailable() && !!emcfActivePos;
+    if (shouldUseEmcf) {
+      setSaving(true);
+      try {
+        const submittedAt = new Date().toISOString();
+        const statusRes = await emcf.status();
+        const statusAny = statusRes as unknown as { status?: boolean; ifu?: string; nim?: string; nime?: string };
+        if (statusAny.status === false) {
+          toast({ title: 'Erreur', description: "e-MCF indisponible", variant: 'destructive' });
+          return;
+        }
+        const vendorIfu = statusAny.ifu;
+        if (!vendorIfu) {
+          toast({ title: 'Erreur', description: "Impossible de déterminer l'IFU vendeur via e-MCF", variant: 'destructive' });
+          return;
+        }
+
+        const totalHTInt = Math.round(totalHT);
+        const tvaInt = Math.round(totalHTInt * 0.18);
+        const totalTTCInt = totalHTInt + tvaInt;
+
+        const operatorName = users.find(u => u.id === user?.id)?.username || user?.username || '';
+
+        const payload = {
+          ifu: vendorIfu,
+          type: 'FV',
+          items: normalizedItems.map(it => {
+            const prod = products.find(p => p.id === it.productId)!;
+            return {
+              code: prod.id,
+              name: prod.name,
+              price: Math.round(prod.unitPrice),
+              quantity: it.quantity,
+              taxGroup: 'B',
+            };
+          }),
+          client: {
+            ifu: (client as unknown as { ifu?: string }).ifu || undefined,
+            name: client.name,
+            contact: (client.phone || client.contactInfo || '') as string,
+            address: client.address || undefined,
+          },
+          operator: {
+            id: user?.id || '',
+            name: operatorName,
+          },
+          payment: [
+            {
+              name: 'ESPECES',
+              amount: totalTTCInt,
+            },
+          ],
+        };
+
+        const invRes = await emcf.submitInvoice(payload);
+        const invAny = invRes as unknown as { uid?: string; total?: number; errorCode?: string; errorDesc?: string };
+        if (!invAny.uid) {
+          toast({ title: 'Erreur', description: invAny.errorDesc || "Réponse e-MCF invalide", variant: 'destructive' });
+          return;
+        }
+        if (typeof invAny.total === 'number' && Math.round(invAny.total) !== totalTTCInt) {
+          try {
+            await emcf.finalizeInvoice(invAny.uid, 'cancel');
+          } catch (e2) {
+            // ignore
+          }
+          toast({ title: 'Erreur', description: 'Totaux e-MCF différents: la demande a été annulée', variant: 'destructive' });
+          return;
+        }
+
+        setEmcfPending({
+          uid: invAny.uid,
+          submittedAt,
+          expiresAtMs: Date.now() + 2 * 60 * 1000,
+          posId: emcfActivePos!.id,
+          statusResponse: statusRes,
+          invoiceResponse: invRes,
+          client,
+          validItems: normalizedItems,
+          itemsPayload,
+          totals: { totalHT: totalHTInt, tva: tvaInt, totalTTC: totalTTCInt, totalDiscount: Math.round(totalDiscount) },
+          emcfPayload: payload,
+        });
+        toast({ title: 'Pré-validation e-MCF', description: 'Vérifiez puis confirmez dans les 2 minutes.' });
+      } catch (err) {
+        logger.error('e-MCF submit failed', err);
+        toast({ title: 'Erreur', description: "Échec de l'appel e-MCF", variant: 'destructive' });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    const invoiceNumber = await db.getNextInvoiceNumber();
 
     const saleData: Sale = {
       id: Date.now().toString(),
@@ -219,6 +362,100 @@ const Sales = () => {
     loadData();
   };
 
+  const handleEmcfFinalize = async (action: 'confirm' | 'cancel') => {
+    if (!emcfPending) return;
+    if (!emcf.isAvailable()) {
+      toast({ title: 'Erreur', description: "e-MCF indisponible", variant: 'destructive' });
+      return;
+    }
+    if (emcfSecondsLeft <= 0) {
+      toast({ title: 'Erreur', description: 'La demande e-MCF a expiré', variant: 'destructive' });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (action === 'cancel') {
+        await emcf.finalizeInvoice(emcfPending.uid, 'cancel', { posId: emcfPending.posId });
+        toast({ title: 'Annulée', description: 'Demande e-MCF annulée' });
+        setEmcfPending(null);
+        return;
+      }
+
+      const sec = await emcf.finalizeInvoice(emcfPending.uid, 'confirm', { posId: emcfPending.posId });
+      const secAny = sec as unknown as { dateTime?: string; qrCode?: string; codeMECeFDGI?: string; counters?: string; nim?: string; errorDesc?: string };
+      if (!secAny.codeMECeFDGI) {
+        toast({ title: 'Erreur', description: secAny.errorDesc || 'Finalisation e-MCF invalide', variant: 'destructive' });
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      const invoiceNumber = await db.getNextInvoiceNumber();
+      const saleId = Date.now().toString();
+      const invoiceId = `${saleId}-inv`;
+
+      const saleData: Sale = {
+        id: saleId,
+        productId: emcfPending.validItems[0].productId,
+        clientId: formData.clientId,
+        quantity: emcfPending.validItems.reduce((s, it) => s + Number(it.quantity), 0),
+        unitPrice: products.find(p => p.id === emcfPending.validItems[0].productId)?.unitPrice || 0,
+        totalPrice: emcfPending.totals.totalTTC,
+        date: nowIso,
+        invoiceNumber,
+        createdBy: user?.id,
+        discount: emcfPending.totals.totalDiscount > 0 ? emcfPending.totals.totalDiscount : undefined,
+        discountType: emcfPending.totals.totalDiscount > 0 ? 'fixed' : undefined,
+        items: emcfPending.validItems.map(it => ({
+          productId: it.productId,
+          quantity: Number(it.quantity),
+          unitPrice: products.find(p => p.id === it.productId)!.unitPrice,
+          discount: it.discount,
+          discountType: it.discountType,
+        })),
+      } as Sale;
+
+      const invoicePayload: Record<string, unknown> = {
+        id: invoiceId,
+        saleId: saleId,
+        invoiceNumber,
+        date: nowIso,
+        clientSnapshot: JSON.stringify(emcfPending.client),
+        productSnapshot: JSON.stringify(emcfPending.itemsPayload.length === 1 ? emcfPending.itemsPayload[0] : emcfPending.itemsPayload),
+        totalPrice: emcfPending.totals.totalTTC,
+        tva: emcfPending.totals.tva,
+        ifu: ((emcfPending.client as unknown) as Client & { ifu?: string }).ifu || undefined,
+        tvaRate: 18,
+        immutableFlag: 1,
+        createdBy: user?.id,
+        discount: emcfPending.totals.totalDiscount > 0 ? emcfPending.totals.totalDiscount : undefined,
+        emcfUid: emcfPending.uid,
+        emcfStatus: 'confirmed',
+        emcfCodeMECeFDGI: secAny.codeMECeFDGI,
+        emcfQrCode: secAny.qrCode,
+        emcfDateTime: secAny.dateTime,
+        emcfCounters: secAny.counters,
+        emcfNim: secAny.nim,
+        emcfPosId: emcfPending.posId,
+        emcfRawResponse: { status: emcfPending.statusResponse, invoice: emcfPending.invoiceResponse, finalize: sec },
+        emcfSubmittedAt: emcfPending.submittedAt,
+        emcfConfirmedAt: nowIso,
+      };
+
+      await db.createSaleWithInvoice(saleData, invoicePayload as unknown as Invoice);
+      toast({ title: 'Succès', description: `Vente enregistrée (e-MCF: ${secAny.codeMECeFDGI})` });
+      setEmcfPending(null);
+      setIsDialogOpen(false);
+      resetForm();
+      loadData();
+    } catch (err) {
+      logger.error('e-MCF finalize failed', err);
+      toast({ title: 'Erreur', description: "Échec lors de la finalisation e-MCF", variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const resetForm = () => {
     setFormData({ clientId: '' });
     setItems([{ productId: '', quantity: '1', discount: '', discountType: 'percentage' }]);
@@ -236,7 +473,13 @@ const Sales = () => {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Liste des Ventes</CardTitle>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEmcfPending(null);
+                setNormalizeWithEmcf(false);
+              }
+            }}>
                 <DialogTrigger asChild>
                   <Button onClick={resetForm}>
                     <Plus className="w-4 h-4 mr-2" />
@@ -247,135 +490,195 @@ const Sales = () => {
                   <DialogHeader>
                     <DialogTitle>Enregistrer une vente</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <Label>Client *</Label>
-                            <Select value={formData.clientId} onValueChange={(value) => setFormData({ ...formData, clientId: value })}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Sélectionner un client" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {clients.map(client => (
-                                  <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="pt-6">
-                            <Button type="button" size="sm" variant="outline" onClick={() => setIsClientDialogOpen(true)}>Ajouter client</Button>
-                          </div>
+                  {emcfPending ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="font-semibold">Pré-validation e-MCF</div>
+                          <div className="text-sm text-muted-foreground">UID: {emcfPending.uid}</div>
                         </div>
+                        <Badge variant={emcfSecondsLeft > 0 ? 'secondary' : 'destructive'}>
+                          {emcfSecondsLeft > 0 ? `Temps restant: ${emcfSecondsLeft}s` : 'Expirée'}
+                        </Badge>
+                      </div>
+
+                      <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span>Total HT:</span>
+                          <span className="font-medium">{emcfPending.totals.totalHT.toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                        <div className="flex justify-between text-destructive">
+                          <span>Remise totale:</span>
+                          <span className="font-medium">- {emcfPending.totals.totalDiscount.toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>TVA (18%):</span>
+                          <span className="font-medium">{emcfPending.totals.tva.toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                        <div className="flex justify-between font-bold text-base pt-1 border-t">
+                          <span>Total TTC:</span>
+                          <span>{emcfPending.totals.totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="outline" disabled={saving} onClick={() => void handleEmcfFinalize('cancel')}>
+                          Annuler e-MCF
+                        </Button>
+                        <Button type="button" disabled={saving || emcfSecondsLeft <= 0} onClick={() => void handleEmcfFinalize('confirm')}>
+                          {saving ? 'Finalisation...' : 'Confirmer'}
+                        </Button>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Produits *</Label>
+                  ) : (
+                    <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="space-y-2">
-                        {items.map((it, idx) => (
-                          <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                            <div className="col-span-5">
-                              <Label className="text-xs">Produit</Label>
-                              <Select value={it.productId} onValueChange={(value) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, productId: value } : p))}>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <Label>Client *</Label>
+                              <Select value={formData.clientId} onValueChange={(value) => setFormData({ ...formData, clientId: value })}>
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Sélectionner un produit" />
+                                  <SelectValue placeholder="Sélectionner un client" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {products.map(product => (
-                                    <SelectItem key={product.id} value={product.id}>{product.name} - Stock: {product.stockQuantity}</SelectItem>
+                                  {clients.map(client => (
+                                    <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Quantité</Label>
-                              <Input type="number" min="1" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
+                            <div className="pt-6">
+                              <Button type="button" size="sm" variant="outline" onClick={() => setIsClientDialogOpen(true)}>Ajouter client</Button>
                             </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Type Remise</Label>
-                              <Select value={it.discountType} onValueChange={(value: 'percentage' | 'fixed') => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discountType: value } : p))}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="percentage">%</SelectItem>
-                                  <SelectItem value="fixed">FCFA</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="col-span-2">
-                              <Label className="text-xs">Valeur Remise</Label>
-                              <Input type="number" min="0" value={it.discount} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discount: e.target.value } : p))} />
-                            </div>
-                            <div className="col-span-1">
-                              <Label className="text-xs"> </Label>
-                              <div className="flex gap-1">
-                                <Button type="button" variant="ghost" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>Suppr</Button>
+                          </div>
+                      </div>
+
+                      <div className="flex items-center justify-between rounded-md border p-3">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium">Normaliser avec e-MCF</div>
+                          <div className="text-xs text-muted-foreground">
+                            {emcf.isAvailable() ? (
+                              emcfActivePos ? `POS actif: ${emcfActivePos.name}` : 'Aucun POS actif'
+                            ) : (
+                              'Disponible uniquement sur Electron'
+                            )}
+                          </div>
+                        </div>
+                        <Switch
+                          checked={normalizeWithEmcf}
+                          onCheckedChange={(v) => setNormalizeWithEmcf(v)}
+                          disabled={!emcf.isAvailable() || !emcfActivePos}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Produits *</Label>
+                        <div className="space-y-2">
+                          {items.map((it, idx) => (
+                            <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                              <div className="col-span-5">
+                                <Label className="text-xs">Produit</Label>
+                                <Select value={it.productId} onValueChange={(value) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, productId: value } : p))}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Sélectionner un produit" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {products.map(product => (
+                                      <SelectItem key={product.id} value={product.id}>{product.name} - Stock: {product.stockQuantity}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="col-span-2">
+                                <Label className="text-xs">Quantité</Label>
+                                <Input type="number" min="1" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
+                              </div>
+                              <div className="col-span-2">
+                                <Label className="text-xs">Type Remise</Label>
+                                <Select value={it.discountType} onValueChange={(value: 'percentage' | 'fixed') => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discountType: value } : p))}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="percentage">%</SelectItem>
+                                    <SelectItem value="fixed">FCFA</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="col-span-2">
+                                <Label className="text-xs">Valeur Remise</Label>
+                                <Input type="number" min="0" value={it.discount} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discount: e.target.value } : p))} />
+                              </div>
+                              <div className="col-span-1">
+                                <Label className="text-xs"> </Label>
+                                <div className="flex gap-1">
+                                  <Button type="button" variant="ghost" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>Suppr</Button>
+                                </div>
                               </div>
                             </div>
+                          ))}
+                          <div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
                           </div>
-                        ))}
-                        <div>
-                          <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Totals preview */}
-                    <div className="border-t pt-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Label className="text-sm font-semibold">Récapitulatif</Label>
+                      <div className="border-t pt-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm font-semibold">Récapitulatif</Label>
+                        </div>
+                        {(() => {
+                          const validItems = items.filter(it => it.productId && parseInt(it.quantity) > 0);
+                          if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
+                          let totalHT = 0;
+                          let totalDiscount = 0;
+                          validItems.forEach(it => {
+                            const prod = products.find(p => p.id === it.productId);
+                            if (!prod) return;
+                            const q = parseInt(it.quantity);
+                            const unit = prod.unitPrice;
+                            const d = parseFloat(it.discount) || 0;
+                            let discountAmount = 0;
+                            if (d > 0) {
+                              if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
+                              else discountAmount = d;
+                            }
+                            totalHT += unit * q - discountAmount;
+                            totalDiscount += discountAmount;
+                          });
+                          const tva = totalHT * 0.18;
+                          const totalTTC = totalHT + tva;
+                          return (
+                            <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+                              <div className="flex justify-between">
+                                <span>Total HT:</span>
+                                <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                              <div className="flex justify-between text-destructive">
+                                <span>Remise totale:</span>
+                                <span className="font-medium">- {totalDiscount.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>TVA (18%):</span>
+                                <span className="font-medium">{tva.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                              <div className="flex justify-between font-bold text-base pt-1 border-t">
+                                <span>Total TTC:</span>
+                                <span>{totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
-                      {(() => {
-                        const validItems = items.filter(it => it.productId && parseInt(it.quantity) > 0);
-                        if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
-                        let totalHT = 0;
-                        let totalDiscount = 0;
-                        validItems.forEach(it => {
-                          const prod = products.find(p => p.id === it.productId);
-                          if (!prod) return;
-                          const q = parseInt(it.quantity);
-                          const unit = prod.unitPrice;
-                          const d = parseFloat(it.discount) || 0;
-                          let discountAmount = 0;
-                          if (d > 0) {
-                            if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
-                            else discountAmount = d;
-                          }
-                          totalHT += unit * q - discountAmount;
-                          totalDiscount += discountAmount;
-                        });
-                        const tva = totalHT * 0.18;
-                        const totalTTC = totalHT + tva;
-                        return (
-                          <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                            <div className="flex justify-between">
-                              <span>Total HT:</span>
-                              <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
-                            </div>
-                            <div className="flex justify-between text-destructive">
-                              <span>Remise totale:</span>
-                              <span className="font-medium">- {totalDiscount.toLocaleString('fr-FR')} FCFA</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>TVA (18%):</span>
-                              <span className="font-medium">{tva.toLocaleString('fr-FR')} FCFA</span>
-                            </div>
-                            <div className="flex justify-between font-bold text-base pt-1 border-t">
-                              <span>Total TTC:</span>
-                              <span>{totalTTC.toLocaleString('fr-FR')} FCFA</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                    
-                    <div className="flex gap-2 justify-end">
-                      <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
-                      <Button type="submit" disabled={saving}>
-                        {saving ? 'Enregistrement...' : 'Enregistrer'}
-                      </Button>
-                    </div>
-                  </form>
+                      
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                        <Button type="submit" disabled={saving}>
+                          {saving ? (normalizeWithEmcf ? 'Pré-validation...' : 'Enregistrement...') : (normalizeWithEmcf ? 'Pré-valider e-MCF' : 'Enregistrer')}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </DialogContent>
               </Dialog>
                 {/* Add client dialog */}

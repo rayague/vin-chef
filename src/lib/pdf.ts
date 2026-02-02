@@ -10,6 +10,11 @@ export interface InvoiceData {
   clientAddress?: string;
   clientPhone?: string;
   clientIFU?: string;
+  emcfCodeMECeFDGI?: string;
+  emcfQrCode?: string;
+  emcfDateTime?: string;
+  emcfCounters?: string;
+  emcfNim?: string;
   // Single-product fields (kept for backward compatibility)
   productName?: string;
   quantity?: number;
@@ -91,6 +96,38 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     doc.text(`Conditions: ${data.paymentTerms}`, 135, 41);
   } else {
     doc.text('Paiement: 30 jours', 135, 41);
+  }
+
+  // e-MCF info (when available)
+  if (data.emcfCodeMECeFDGI || data.emcfQrCode || data.emcfNim || data.emcfCounters || data.emcfDateTime) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(accent[0], accent[1], accent[2]);
+    doc.text('e-MCF', 135, 47);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(primary[0], primary[1], primary[2]);
+    let emcfY = 51;
+    if (data.emcfCodeMECeFDGI) {
+      doc.text(`Code: ${data.emcfCodeMECeFDGI}`, 135, emcfY);
+      emcfY += 4;
+    }
+    if (data.emcfDateTime) {
+      doc.text(`Date/Heure: ${data.emcfDateTime}`, 135, emcfY);
+      emcfY += 4;
+    }
+    if (data.emcfNim) {
+      doc.text(`NIM: ${data.emcfNim}`, 135, emcfY);
+      emcfY += 4;
+    }
+    if (data.emcfCounters) {
+      doc.text(`Compteurs: ${data.emcfCounters}`, 135, emcfY);
+      emcfY += 4;
+    }
+    if (data.emcfQrCode) {
+      const qr = String(data.emcfQrCode);
+      const short = qr.length > 64 ? `${qr.slice(0, 64)}…` : qr;
+      doc.text(`QR: ${short}`, 135, emcfY);
+    }
   }
 
   // Buyer / Client information

@@ -66,6 +66,18 @@ export interface Invoice {
   createdBy?: string;
   discount?: number; // Montant de la remise appliquée
   discountType?: 'percentage' | 'fixed'; // Type de remise
+
+  emcfUid?: string;
+  emcfStatus?: string;
+  emcfCodeMECeFDGI?: string;
+  emcfQrCode?: string;
+  emcfDateTime?: string;
+  emcfCounters?: unknown;
+  emcfNim?: string;
+  emcfPosId?: string;
+  emcfRawResponse?: unknown;
+  emcfSubmittedAt?: string;
+  emcfConfirmedAt?: string;
 }
 
 // Storage keys

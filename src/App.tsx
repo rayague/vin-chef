@@ -19,6 +19,7 @@ import RequireAdmin from './components/RequireAdmin';
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import Backups from "./pages/Backups";
+import EmcfSettings from "./pages/EmcfSettings";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/stock" element={<StockManagement />} />
                 <Route path="/backups" element={<Backups />} />
                 <Route path="/audits" element={<AuditLogs />} />
+                <Route path="/emcf" element={<EmcfSettings />} />
               </Route>
               <Route path="/sales" element={<Sales />} />
               <Route path="/customers" element={<Customers />} />

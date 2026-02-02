@@ -1,0 +1,557 @@
+
+
+===== PAGE 1 =====
+ 
+ 
+1 
+ 
+ 
+MACHINES ELECTRONIQUES 
+CERTIFIEES DE FACTURATION 
+ 
+SPECIFICATION DE L’ API POUR L’e-MCF 
+Date Version Par Description 
+15/01/2021 1.0 DGI Première version 
+    
+ 
+INTRODUCTION ...................................................................................................................................... 2 
+DESCRIPTION GÉNÉRALE DE L’API ......................................................................................................... 2 
+PRÉ-EXIGENCES ...................................................................................................................................... 2 
+FORMAT DE DONNÉES ....................................................................................................................... 3 
+AUTHENTIFICATION ........................................................................................................................... 3 
+API METHODS..................................................................................................................................... 3 
+DESCRIPTION DE L’API ........................................................................................................................... 4 
+FLUX DE TRAVAIL POUR L’ENREGISTREMENT DE LA NOUVELLE FACTURE NORMALISÉE ..................... 5 
+URL DE L’API ........................................................................................................................................... 6 
+METHODES DE L’API DE FACTURATION ................................................................................................. 7 
+1.1 DEMANDE DE STATUT .................................................................................................................. 7 
+1.2 DEMANDE DE FACTURE ............................................................................................................... 9 
+1.3 DEMANDE DE FINALISATION...................................................................................................... 14 
+1.4 DEMANDE DE DÉTAILS SUR LA FACTURE EN ATTENTE .............................................................. 16 
+METHODES DE L’API D’INFORMATION ................................................................................................ 19 
+2.1 INFORMATIONS SUR LES E-MCF ................................................................................................ 19 
+2.2 INFORMATIONS SUR LES GROUPES DE TAXATION .................................................................... 21 
+2.3 INFORMATIONS SUR LES TYPES DE FACTURES .......................................................................... 22 
+2.4 INFORMATIONS SUR LES TYPES DE PAIEMENT .......................................................................... 23 
+ 
+
+
+===== PAGE 2 =====
+ 
+ 
+2 
+ 
+INTRODUCTION 
+Dans le cadre de la réforme de la facture normalisée, les contribuables doivent émettre une facture 
+normalisée à l’aide de machines électroniques certifies de facturation (MECeF). 
+Les contribuables propriétaires de leur système de facturation d’entreprise (SFE) peuvent connecter 
+leur logiciel au module de facturation (MCF) et produire facture normalisée, en mettant en œuvre un 
+protocole normalisé qui permet l’éc hange de données entre le SFE et le MCF. Dans ce processus, le 
+SFE envoie des données de facture au MCF et le MCF répond par des éléments de sécurité (Code 
+MECeF/DGI entre autres), qui sont nécessaires pour produire facture normalisée. 
+La DGI introduit maintenant une autre option pour les contribuables qui utilisent leur propre SFE – l’e-
+MCF (Module de contrôle dématérialisé). L’e-MCF est une implémentation logicielle d u MCF du côté 
+de la DGI. Le SFE peut communiquer avec  l’e-MCF via l’interface de programm ation d’applications 
+(API) pour obtenir des éléments de sécurité et produire facture normalisée sans avoir besoin de la 
+machine physique. 
+Ce document s’adresse aux contribuables qui souhaitent utiliser e-MCF et décrit l’API qui est 
+disponible du côté de l’e-MCF. 
+DESCRIPTION GÉNÉRALE DE L’API 
+Une API est fournie par la DGI avec la description générale suivante : 
+Nom de l’API Version 
+actuelle 
+Utilisé par Description 
+e-MCF-API 1.0 Les contribuables ayant 
+approuvé leur SFE pour se 
+connecter à l’e-MCF 
+Le contribuable peut utiliser cette 
+API afin de soumettre les données de 
+facture à la DGI et d’obtenir les 
+éléments de sécurité nécessaires 
+pour produire facture normalisée 
+  
+ 
+PRÉ-EXIGENCES 
+Pour accéder à l’API, les conditions suivantes doivent être remplies : 
+1. Le contribuable est enregistré par la DGI en tant que l’utilisateur d’e-MCF 
+ 
+Le contribuable doit s’adresser à la DGI afin d’obtenir et de soumettre la « demande 
+d’utilisation d’e-MCF ». La DGI activera le compte du contribuable et créera le nombre des e-
+MCF demandé (un e-MCF pour chacun des magasins du contribuable). Le contribuable recevra 
+automatiquement un e -mail avec les paramètres pour se connecter au système. Après une 
+connexion réussie, le contribuable se présente avec l’interface de gestion d’e-MCF. 
+ 
+ 
+ 
+
+===== PAGE 3 =====
+ 
+ 
+3 
+ 
+2. La DGI a activé les e-MCF 
+ 
+Une fois qu ’e-MCF est activé  par la DGI , il peut être utilisé pour enregistrer factures 
+normalisées. 
+ 
+3. La DGI a créé des jetons de sécurité qui autorisent SFE à accéder à l’API 
+Afin d’autoriser le SFE à accéder à l’API, le contribuable doit obtenir un jeton pour chaque e-
+MCF. Les jetons sont crées par la DGI. 
+REMARQUE : gardez les jetons secrets ! Utilisez -les uniquement pour configurer votre SFE 
+pour accéder à l’API. Les jetons ne doivent pas être  partagés ou sauvegardés partout où le 
+personnel non autorisé a accès. 
+ 
+4. Le contribuable dispose d’une connexion Internet et peut accéder au serveur d’e-MCF 
+Avec le jeton prêt, le SFE du contribuable peut commencer à communiquer avec  l’e-MCF afin 
+d’enregistrer les factures normalisées. 
+ 
+FORMAT DE DONNÉES 
+API prend en charge le format de données JSON, tant dans les demandes que dans les réponses. 
+Les en-têtes de demande sont définis comme suit : 
+Request header Valeur Description 
+content-type application/json La demande contient des données JSON 
+accept application/json La réponse doit être au format JSON 
+ 
+AUTHENTIFICATION 
+L'authentification est fournie par le biais d'un jeton  JWT qui doit être inclus dans l'en -tête de 
+demande. 
+Request header Valeur Description 
+Authorization Bearer <token> <token> a la valeur du jeton fourni par le système de 
+gestion d’e-MCF 
+ 
+Les demandes non autorisées retourneront le code d'état HTTP 401 Unauthorized. 
+API METHODS 
+L’API est RESTful et utilise les méthodes GET, POST et PUT. 
+Toute demande POST doit contenir le corps de contenu, sinon API retournera le code d'état HTTP 400 
+Bad Request. 
+
+===== PAGE 4 =====
+ 
+ 
+4 
+ 
+DESCRIPTION DE L’API 
+L’API a deux parties :  
+1. API de facturation 
+2. API d’information 
+L’API de facturation est utilisée pour enregistrer de nouvelle facture normalisée et est basée sur 
+quatre méthodes : 
+API DE FACTURATION 
+Type Méthode Description 
+GET Demande de 
+statut 
+Vérifier l’état de l’API  
+POST Demande de 
+facture 
+Soumettre les données de la facture et obtenir des montants 
+calculés par l’e-MCF 
+PUT Demande de 
+finalisation 
+Finaliser la facture : 
+Option 1 – confirmer la facture  
+Cette option est utilisée si le SFE veut finaliser la facture. La 
+réponse contiendra des éléments de sécurité basés sur 
+lesquels le SFE peut émettre facture normalisée 
+Option 2 – annuler la facture  
+Cette option est utilisée si le SFE veut annuler la facture. La 
+réponse ne contient pas le Code MECeF/DGI et  le SFE ne 
+peut pas émettre facture normalisée 
+GET 
+/{uid} 
+Demande de 
+détails sur la 
+facture en attente 
+Cette méthode est utilisée pour vérifier les données sur la facture 
+qui n’est pas encore finalisée (demande de facture est émise mais 
+demande de finalisation n’est toujours pa s émise), au cas où SFE 
+souhaite vérifier le contenu qui a été envoyé en utilisant le POST.  
+L’API d’information est utilisée pour obtenir de l’information sur les e-MCF, les groupes de taxation, 
+les types de factures disponibles et les types de paiements disponibles et est basée sur quatre 
+méthodes : 
+API D’INFORMATION 
+Type Méthode Description 
+GET  
+/status 
+Informations sur 
+les e-MCF 
+Vérifier l’état de l’API et obtenir la liste de tous les e-MCF  
+GET 
+/taxGroups 
+Informations sur 
+les groupes de 
+taxation 
+Obtenir de l’information sur les groupes fiscaux disponibles et leurs 
+valeurs 
+GET 
+/invoiceTypes 
+Informations sur 
+les types de 
+factures 
+Obtenir des informations sur les types de factures disponibles 
+GET 
+/paymentTypes 
+Informations sur 
+les types de 
+paiement 
+Obtenir de l’information sur les types de paiement disponibles  
+  
+
+===== PAGE 5 =====
+ 
+ 
+5 
+ 
+FLUX DE TRAVAIL POUR L’ENREGISTREMENT DE 
+LA NOUVELLE FACTURE NORMALISÉE 
+Le flux de travail de l’opération de SFE qui est utilisé lors de l’enregistrement de facture normalisée est 
+affiché sur le diagramme suivant : 
+ 
+ 
+ 
+Il est recommandé que le SFE vérifie la disponibilité de l’API 
+après une certaine période d’inactivité en envoyant la 
+demande de statut. Cette étape est facultative. Toutefois, si 
+api retourne une erreur vérifier ce jeton n’a pas expiré. 
+SFE envoie des données de facture avec la méthode de 
+demande de facture. 
+L’API retournera les totaux en fonction des données envoyées 
+dans la demande de facture. Le SFE doit vérifier les totaux 
+retournés par  l’API avec son propre calcul afin de s’assurer 
+qu’il n’y a pas eu d’erreur dans la préparation des données 
+qui ont été envoyées à l’API.  
+Sur cette base, le SFE a deux options : 
+- Confirmer la demande de facture et finaliser la 
+facture normalisée. La facture sera enregistrée dans 
+l’e-MCF. 
+- Annuler la facture. La facture sera enregistrée dans 
+l’e-MCF comme annulé. 
+Si le SFE n’envoie pas de demand e de finalisation, l’e-MCF 
+marquera la demande de facture comme expirée après 2 
+minutes. En attendant la demande de finalisation, la 
+demande de facture est considérée comme étant dans l’état 
+en attente. L’e-MCF peut avoir un maximum de 10 demandes 
+de factures dans l’état en attente.  
+ 
+ 
+  
+
+
+===== PAGE 6 =====
+ 
+ 
+6 
+ 
+URL DE L’API 
+ 
+L’API de facturation est disponible sur l’adresse suivante : 
+ 
+Serveur {API_FACTURATION_URL}  
+PRODUCTION https://sygmef.impots.bj/emcf/api/invoice 
+TEST https://developper.impots.bj/sygmef-emcf/api/invoice 
+ 
+L’API d’information est disponible sur l’adresse suivante : 
+ 
+Serveur {API_INFORMATION_URL}  
+PRODUCTION https://sygmef.impots.bj/emcf/api/info 
+TEST https://developper.impots.bj/sygmef-emcf/api/info 
+ 
+  
+
+===== PAGE 7 =====
+ 
+ 
+7 
+ 
+METHODES DE L’API DE FACTURATION 
+1.1 DEMANDE DE STATUT 
+La demande de statut est utilisée pour obtenir un statut de l’API, de jeton et de factures en attente. 
+• URL     {API_FACTURATION_URL}/ 
+• Method:    GET 
+• URL Params:    NONE 
+• Success Response (HTTP code 200): JSON(StatusResponseDto) 
+ 
+L’objet StatusResponseDto est défini comme : 
+Champ Type Description 
+status Boolean true si l'API est opérationnelle, false 
+sinon 
+version String version de l'API 
+ifu String IFU du contribuable 
+nim String NIM d’e-MCF 
+tokenValid Datetime validité de la clé API utilisée 
+serverDateTime Datetime date et heure actuelle du serveur API 
+pendingRequestsCount Integer Nombre de demandes de factures en 
+attente (demandes qui ne sont pas 
+finalisées) 
+pendingRequestsList Array<PendingRequestDto> Liste des demandes de factures en 
+attente 
+L’objet PendingRequestDto est défini comme : 
+Champ Type Description 
+date Datetime Date et heure à laquelle la demande de 
+facture a été reçue  
+uid String UID de la demande de facture 
+ 
+  
+
+===== PAGE 8 =====
+ 
+ 
+8 
+ 
+Exemple : 
+Demande : 
+ 
+GET /api/invoice HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+ 
+{ 
+    "status": true, 
+    "version": "1.0", 
+    "ifu": "99999000000001", 
+    "nime": "XX01000001", 
+    "tokenValid": "2020-11-28T00:00:00+01:00", 
+    "serverDateTime": "2020-11-21T17:25:14.7179651+01:00", 
+    "pendingRequestsCount": 4, 
+    "pendingRequestsList": [ 
+        { 
+            "date": "2020-11-20T21:45:56.523+01:00", 
+            "uid": "437261A6-41BD-4D7B-B61B-E60C2D8089AA" 
+        }, 
+        { 
+            "date": "2020-11-20T21:46:49.207+01:00", 
+            "uid": "313AE8C2-1EAC-4DE9-AF40-7A0240599114" 
+        }, 
+        { 
+            "date": "2020-11-20T21:47:41.407+01:00", 
+            "uid": "C562ADCF-BCF5-4592-A95F-5A5617C66FD8" 
+        }, 
+        { 
+            "date": "2020-11-20T21:48:17.78+01:00", 
+            "uid": "83221CFF-C2C6-46B2-A1FD-35BDD0553A27" 
+        } 
+    ] 
+} 
+  
+
+===== PAGE 9 =====
+ 
+ 
+9 
+ 
+1.2 DEMANDE DE FACTURE 
+La demande de facture est utilisée pour envoyer les données sur la facture à l’e-MCF et d’obtenir les 
+totaux calculés par l’e-MCF. 
+• URL     {API_FACTURATION_URL}/ 
+• Method :    POST 
+• Body content :    JSON(InvoiceRequestDataDto) 
+• Success Response (HTTP code 200) : JSON(InvoiceResponseDataDto) 
+ 
+L’objet InvoiceRequestDataDto est défini comme : 
+Champ Type de champ Longueur Optionnel Description Exemple 
+ifu string 13 Non IFU du vendeur 
+ 
+999990000000
+1 
+aib AibGroupTypeEnum 1 Oui AIB tax type: 
+- A – en cas de l’AIB 1% 
+- B – en cas de l’AIB 5% 
+A 
+type InvoiceTypeEnum 2 Non Type de la facture : 
+- FV – Facture de vente 
+- EV – Facture de vente 
+à l’exportation 
+- FA – Facture d’avoir 
+- EA – Facture d’avoir à 
+l’exportation 
+FV 
+items Array<ItemDto>  No Liste des articles sur la 
+facture 
+ 
+client ClientDto  Oui Détails du client 
+(acheteur) 
+ 
+operator OperatorDto  Non Détails de l’opérateur 
+POS 
+ 
+payment Array<PaymentDto>  Oui 
+ 
+Détails du type de 
+paiement. Si le champ 
+n’est pas présent, le 
+paiement dans l’ESPECES 
+est considéré par défaut 
+ 
+reference string 24 Non pour 
+les types de 
+factures FA, 
+EA 
+Référence de la facture 
+originale en cas de 
+facture d’avoir (FA ou EA) 
+Le contenu est de 24 
+caractères de Code 
+MECeF/DGI de la facture 
+originale 
+ABCDABCDABCD 
+ABCDABCDABCD 
+ 
+ 
+
+===== PAGE 10 =====
+ 
+ 
+10 
+ 
+L’objet ClientDto est défini comme : 
+Champ Type de champ Longueur Optionnel Description Exemple 
+ifu string 13 Oui IFU du client  9999900000002 
+name string  Oui Nom du client SUPERMARHCE SARL 
+contact string  Oui Contact du client 7783727,info@test.com 
+address string  Oui Adresse du client Boulevard 23, Cotonou 
+L’objet OperatorDto est défini comme : 
+Champ Type de champ Longueur Optionnel Description Exemple 
+id string  Oui Identification de 
+l’opérateur 
+01 
+name string  Non Nom de l’opérateur Jacques 
+L’objet PaymentDto est défini comme : 
+Champ Type de champ Longueur Optionnel Description Exemple 
+name PaymentTypeEnum  Non Description du paiement. 
+Peut être l’un des éléments 
+suivants : 
+• ESPECES                     
+• VIREMENT 
+• CARTEBANCAIRE 
+• MOBILEMONEY 
+• CHEQUES 
+• CREDIT 
+• AUTRE 
+ESPECES 
+amount integer  Non Name  1240 
+L’objet ItemDto est défini comme : 
+Champ Type de 
+champ 
+Long
+ueur 
+Optionn
+el 
+Description Exemple 
+code string  Oui Code d’article 92891 
+name string  No Nom d’article Lait 
+price integer  No Prix unitaire 1200 
+quantity decimal  No Quantité 12.250 
+taxGroup TaxGroupType
+Enum 1 No Groupe de taxation. L’un des 
+éléments suivants : 
+A, B, C, D, E, F 
+A 
+taxSpecific integer  Oui Valeur de la taxe specifique 
+pour l’ensemble de la 
+quantité (non par unité de 
+l’article) 
+ 
+230 
+originalPrice integer  Oui Prix d’origine en cas de 
+modification du prix 
+2400 
+priceModification string  Oui Description de la 
+modification des prix au cas 
+où il y aurait modification du 
+prix 
+Remise 50% 
+
+===== PAGE 11 =====
+ 
+ 
+11 
+ 
+L’objet InvoiceResponseDataDto est défini comme : 
+Champ Type de 
+champ 
+Longueur Description Exemple 
+uid string 36 Identification de la transaction. Cette valeur 
+est utilisée en demande de finalisation. 
+ac33f8fe-9735-
+4ed6-a9c3-
+df58a908ccd3 
+ta    integer  Valeur du groupe de taxation A (en %) 0 
+tb integer  Valeur du groupe de taxation B (en %) 18 
+tc integer  Valeur du groupe de taxation C (en %) 0 
+td integer  Valeur du groupe de taxation D (en %) 18 
+taa integer  Montant total pour le groupe A 100 
+tab integer  Montant total pour le groupe B 0 
+tac integer  Montant total pour le groupe C 0 
+tad integer  Montant total pour le groupe D 0 
+tae integer  Montant total pour le groupe E 0 
+taf integer  Montant total pour le groupe F 0 
+hab integer  Montant HT pour le groupe B 0 
+had integer  Montant HT pour le groupe D 0 
+vab integer  Montant TVA pour le groupe B 0 
+vad integer  Montant TVA pour le groupe D 0 
+aib integer  Montant de l’AIB 0 
+ts    integer  Montant de l’impôt spécifique 0 
+total integer  Montant total sur la facture 100 
+errorCode string  Facultatif : code d’erreur en cas d’erreur. Uid 
+est nul dans ce cas 
+1 
+errorDesc string  Facultatif : description des erreurs en cas 
+d’erreur. Uid est nul dans ce cas 
+Le nombre 
+maximum de 
+factures en 
+attente est 
+dépassé 
+ 
+  
+
+===== PAGE 12 =====
+ 
+ 
+12 
+ 
+Exemple: 
+Demande : 
+POST /api/invoice HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+Content-Type: application/json 
+Content-Length: 765 
+ 
+{ 
+   "ifu":"9999900000001", 
+   "type":"FV", 
+   "items":[ 
+      { 
+         "name":"Jus d'orange", 
+         "price":1800, 
+         "quantity":2, 
+         "taxGroup":"B" 
+      }, 
+      { 
+         "name":"Lait 1/1 EX", 
+         "price":450, 
+         "quantity":3, 
+         "taxGroup":"A" 
+      } 
+   ], 
+   "client":{ 
+      "contact":"45661122", 
+      "ifu":"99999000000002", 
+      "name":"Nom du client", 
+      "address":"Rue d'ananas 23" 
+   }, 
+   "operator":{ 
+      "id":"", 
+      "name":"Jacques" 
+   }, 
+   "payment":[ 
+      { 
+         "name":"ESPECES", 
+         "amount":4950 
+      } 
+   ] 
+} 
+ 
+  

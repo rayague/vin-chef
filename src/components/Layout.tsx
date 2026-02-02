@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Package, Users, TrendingUp, FileText, LogOut, Layers, Warehouse } from 'lucide-react';
+import { Package, Users, TrendingUp, FileText, LogOut, Layers, Warehouse, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import logger from '@/lib/logger';
 
@@ -33,7 +33,7 @@ const Layout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="h-screen bg-background relative overflow-hidden">
       <aside
         className={`fixed left-0 top-0 bottom-0 flex flex-col transition-all duration-200 ease-in-out ${collapsed ? 'w-20' : 'w-64'} bg-[hsl(var(--sidebar-background))] text-[hsl(var(--sidebar-foreground))] border-r border-[hsl(var(--sidebar-border))] overflow-y-auto`}
         style={{
@@ -46,9 +46,9 @@ const Layout = () => {
           boxShadow: import.meta.env.DEV ? '2px 0 8px rgba(0,0,0,0.08)' : undefined,
           // visual fallback when Tailwind/PostCSS isn't applied: explicit background, border and height
           // Use the same HSL palette as `src/index.css` so colors match the design system
-          backgroundColor: 'hsl(350 60% 18%)',
-          color: 'hsl(36 20% 98%)',
-          borderRight: '1px solid hsl(350 60% 12%)',
+          backgroundColor: 'hsl(var(--sidebar-background))',
+          color: 'hsl(var(--sidebar-foreground))',
+          borderRight: '1px solid hsl(var(--sidebar-border))',
           minHeight: '100vh',
         }}
         data-dev-sidebar={import.meta.env.DEV ? '1' : '0'}
@@ -57,7 +57,7 @@ const Layout = () => {
           <div className="flex items-center gap-3">
             <img src="/logo_vin.jpeg" className="w-8 h-8 object-contain rounded-full" alt="Logo" />
             <div>
-              <h2 className="text-lg font-bold">Cave Premium</h2>
+              <h2 className="text-lg font-bold text-[hsl(var(--sidebar-primary))]">Cave Premium</h2>
               <p className="text-sm opacity-90">{user?.username}</p>
             </div>
           </div>
@@ -99,6 +99,7 @@ const Layout = () => {
                     {/* Backups and Audit temporarily hidden per request - uncomment to restore */}
                     {/* <SidebarItem collapsed={collapsed} to="/backups" icon={<Layers />} label="Sauvegardes" /> */}
                     {/* <SidebarItem collapsed={collapsed} to="/audits" icon={<FileText />} label="Audit" /> */}
+                    <SidebarItem collapsed={collapsed} to="/emcf" icon={<Settings />} label="Paramètres e-MCF" />
                     <SidebarItem collapsed={collapsed} to="/clients" icon={<Users />} label="Utilisateurs" />
                   </>
                 )}
@@ -136,7 +137,7 @@ const Layout = () => {
         </div>
       </aside>
 
-      <main className="transition-all p-6" style={{ marginLeft: collapsed ? '5rem' : '16rem' }}>
+      <main className="transition-all p-6 h-screen overflow-y-auto" style={{ marginLeft: collapsed ? '5rem' : '16rem' }}>
         <Outlet />
       </main>
     </div>

@@ -5,19 +5,27 @@ import '@testing-library/jest-dom';
 import { vi, describe, it, expect, afterEach, beforeAll } from 'vitest';
 
 // In-memory mock store for clients
-const clientsStore: Array<any> = [
+type ClientRow = {
+  id: string;
+  name: string;
+  phone?: string;
+  discount?: number;
+  discountType?: 'percentage' | 'fixed';
+};
+
+const clientsStore: ClientRow[] = [
   { id: 'c1', name: 'Client A', phone: '+22997000000' }
 ];
 
 const dbMock = {
   getClients: async () => clientsStore.slice(),
-  updateClient: async (id: string, updates: any) => {
+  updateClient: async (id: string, updates: Partial<ClientRow>) => {
     const idx = clientsStore.findIndex(c => c.id === id);
     if (idx === -1) return null;
     clientsStore[idx] = { ...clientsStore[idx], ...updates };
     return clientsStore[idx];
   },
-  addClient: async (client: any) => {
+  addClient: async (client: ClientRow) => {
     clientsStore.push(client);
     return client;
   },

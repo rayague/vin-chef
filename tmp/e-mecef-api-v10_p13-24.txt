@@ -1,0 +1,513 @@
+
+
+===== PAGE 13 =====
+ 
+ 
+13 
+ 
+Réponse : 
+{ 
+    "uid": "ac33f8fe-9735-4ed6-a9c3-df58a908ccd3", 
+    "ta": 0, 
+    "tb": 18, 
+    "tc": 0, 
+    "td": 18, 
+    "taa": 1350, 
+    "tab": 3600, 
+    "tac": 0, 
+    "tad": 0, 
+    "tae": 0, 
+    "taf": 0, 
+    "hab": 3051, 
+    "had": 0, 
+    "vab": 549, 
+    "vad": 0, 
+    "total": 4950, 
+    "aib": 0, 
+    "ts": 0 
+} 
+  
+
+===== PAGE 14 =====
+ 
+ 
+14 
+ 
+1.3 DEMANDE DE FINALISATION 
+Confirmer ou annuler la demande de facture. 
+• URL     {API_FACTURATION_URL}/{UID}/{ACTION} 
+• Method:    POST 
+• URL Params    {UID}, {ACTION} 
+• Success Response (HTTP code 200): JSON(SecurityElementsDto) 
+ 
+Description des paramètres de l’URL : 
+Champ Type de 
+champ 
+Longueur Optionnel Description Exemple 
+UID string 36 Non UID qui a été reçu dans la 
+réponse 
+(InvoiceResponseDataDto) de la 
+demande de facture 
+e5af2ff9-0ac8-
+4924-b8b7-
+cc9da3a17db8 
+ACTION string  Non Peut-être: 
+- confirmer – confirmer la 
+demande de facture 
+- annuler – annuler la 
+demande de facture  
+confirm 
+ 
+ 
+L’objet SecurityElementsDto est défini comme : 
+Champ Type de 
+champ 
+Longueur Description Exemple 
+dateTime string 19 Date et heure de la facture  21/11/2020 
+14:44:23 
+qrCode string 66 Contenu du code QR. Le champ 
+est vide si la facture est 
+annulée. 
+F;…. 
+codeMECeFDGI string 29 Code MECeF/DGI. 
+Le champ est vide si la facture 
+est annulée. 
+UJKI-…. 
+counters string  Compteurs 23/56 FV 
+nim string 10 NIM d’e-MCF XX01000001 
+errorCode string  Facultatif : code d’erreur en cas 
+d’erreur 
+11 
+errorDesc string  Facultatif : description des 
+erreurs en cas d’erreur 
+La facture n'existe 
+pas ou elle est déjà 
+finalisée / annulée 
+ 
+  
+
+===== PAGE 15 =====
+ 
+ 
+15 
+ 
+Exemple : 
+Demande : 
+PUT /api/invoice/ac33f8fe-9735-4ed6-a9c3-df58a908ccd3/confirm HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+{ 
+    "dateTime": "23/11/2020 13:17:08", 
+    "qrCode": "F;IN01000005;X537E4DBAJUUHHXNFWISFEKJ;9999900000001;20201123131708", 
+    "codeMECeFDGI": "X537-E4DB-AJUU-HHXN-FWIS-FEKJ", 
+    "counters": "64/64 FV", 
+    "nim": "IN01000005" 
+} 
+ 
+  
+
+===== PAGE 16 =====
+ 
+ 
+16 
+ 
+1.4 DEMANDE DE DÉTAILS SUR LA FACTURE EN ATTENTE 
+Confirmer ou annuler la demande de facture. 
+• URL     {API_FACTURATION_URL}/{UID} 
+• Method:    GET 
+• URL Params    {UID} 
+• Success Response (HTTP code 200): JSON(InvoiceDetailsDto) 
+ 
+Description des paramètres de l’URL : 
+Champ Type de 
+champ 
+Longueur Optionnel Description Exemple 
+UID string 36 Non UID qui a été reçu dans la 
+réponse 
+(InvoiceResponseDataDto) de la 
+demande de facture 
+e5af2ff9-0ac8-
+4924-b8b7-
+cc9da3a17db8 
+ 
+L’objet InvoiceDetailsDto est défini comme : 
+Champ Type de champ Longueur Optionnel Description Exemple 
+ifu string 13 Non IFU du vendeur 9999900000001 
+aib AibGroupTypeEnum 1 Oui AIB tax type: 
+• A – en cas de l’AIB 
+1% 
+• B – en cas de l’AIB 
+5% 
+A 
+type InvoiceTypeEnum 2 Non Type de la facture : 
+1. FV – Facture de 
+vente 
+2. EV – Facture 
+de vente à 
+l’exportation 
+3. FA – Facture 
+d’avoir 
+4. EA – Facture 
+d’avoir à 
+l’exportation 
+FV 
+items Array<ItemDto>  No Liste des articles sur la 
+facture 
+ 
+
+===== PAGE 17 =====
+ 
+ 
+17 
+ 
+client ClientDto  Oui Détails du client 
+(acheteur) 
+ 
+operator OperatorDto  Non Détails de l’opérateur 
+POS 
+ 
+payment Array<PaymentDto>  Oui 
+ 
+Détails du type de 
+paiement. Si le champ 
+n’est pas présent, le 
+paiement dans 
+l’ESPECES est considéré 
+par défaut 
+ 
+reference string  Non pour 
+les types de 
+factures FA, 
+EA 
+Référencement à la 
+facture originale en cas 
+de FA et EA 
+TE01000123-
+433 
+errorCode string  Facultatif : 
+code 
+d’erreur en 
+cas d’erreur 
+  
+errorDesc string  Facultatif : 
+description 
+des erreurs 
+en cas 
+d’erreur 
+  
+     
+Les objets ClientDto, OperatorDto, PaymentDto, ItemDto sont déjà définis dans la section 
+InvoiceRequestDto. 
+ 
+  
+
+===== PAGE 18 =====
+ 
+ 
+18 
+ 
+Exemple : 
+Demande : 
+GET /api/invoice/ac33f8fe-9735-4ed6-a9c3-df58a908ccd3 HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+{ 
+   "ifu":"9999900000001", 
+   "type":"FV", 
+   "items":[ 
+      { 
+         "name":"Jus d'orange", 
+         "price":1800, 
+         "quantity":2, 
+         "taxGroup":"B" 
+      }, 
+      { 
+         "name":"Lait 1/1 EX", 
+         "price":450, 
+         "quantity":3, 
+         "taxGroup":"A" 
+      } 
+   ], 
+   "client":{ 
+      "contact":"45661122", 
+      "ifu":"99999000000002", 
+      "name":"Nom du client", 
+      "address":"Rue d'ananas 23" 
+   }, 
+   "operator":{ 
+      "id":"", 
+      "name":"Jacques" 
+   }, 
+   "payment":[ 
+      { 
+         "name":"ESPECES", 
+         "amount":4950 
+      } 
+   ] 
+} 
+ 
+ 
+  
+
+===== PAGE 19 =====
+ 
+ 
+19 
+ 
+METHODES DE L’API D’INFORMATION 
+2.1 INFORMATIONS SUR LES E-MCF 
+La demande de statut est utilisée pour obtenir un statut de l’API, de jeton et de factures en attente. 
+• URL     {API_INFORMATION_URL}/status 
+• Method:    GET 
+• URL Params:    NONE 
+• Success Response (HTTP code 200): JSON(InfoResponseDto) 
+ 
+L’objet InfoResponseDto est défini comme : 
+Champ Type Description 
+status Boolean true si l'API est opérationnelle, false 
+sinon 
+version String version de l'API 
+ifu String IFU du contribuable 
+nim String NIM d’e-MCF dont le jeton a été utilisé 
+tokenValid Datetime validité de la clé API utilisée 
+serverDateTime Datetime date et heure actuelle du serveur API 
+emcfList Array<EmcfInfoDto> Liste des demandes de factures en 
+attente 
+L’objet EmcfInfoDto est défini comme : 
+Champ Type Description 
+nim String NIM de l’e-MCF  
+status String Statut de l’e-MCF. Peut être : 
+• Enregistré – si l’e-MCF n’est pas activé par le DGI 
+• Actif –si e-MCF est actif (peut enregistrer de nouvelles factures) 
+• Désactivé – si e-MCF est désactivé (ne peut pas enregistrer de 
+nouvelles factures) 
+shopName String Nom du point de vente 
+address1 String Rue 
+address2 String Description de l'emplacement 
+address3 String Ville 
+contact1 String Téléphone 
+contact2 String E-mail 
+contact3 String Téléphone/e-mail supplémentaire 
+ 
+
+===== PAGE 20 =====
+ 
+ 
+20 
+ 
+Exemple : 
+Demande : 
+ 
+GET /api/info/status HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+ 
+{ 
+    "status": true, 
+    "version": "1.0", 
+    "ifu": "9999900000001", 
+    "nim": "XX01000070", 
+    "tokenValid": "2021-01-31T00:00:00+01:00", 
+    "serverDateTime": "2021-01-05T21:26:18.9775221+01:00", 
+    "emcfList": [ 
+        { 
+            "nim": "XX01000070", 
+            "status": "Actif", 
+            "shopName": "TEST #70", 
+            "address1": "Boulevard 23", 
+            "address2": null, 
+            "address3": "Cotonou", 
+            "contact1": "12345678", 
+            "contact2": null, 
+            "contact3": null 
+        }, 
+{ 
+            "nim": "XX01000071", 
+            "status": "Désactivé", 
+            "shopName": "TEST #70", 
+            "address1": "Boulevard 23", 
+            "address2": null, 
+            "address3": "Cotonou", 
+            "contact1": "12345678", 
+            "contact2": null, 
+            "contact3": null 
+        } 
+    ] 
+} 
+  
+
+===== PAGE 21 =====
+ 
+ 
+21 
+ 
+2.2 INFORMATIONS SUR LES GROUPES DE TAXATION 
+La demande de statut est utilisée pour obtenir un statut de l’API, de jeton et de factures en attente. 
+• URL     {API_INFORMATION_URL}/taxGroups 
+• Method:    GET 
+• URL Params:    NONE 
+• Success Response (HTTP code 200): JSON(TaxGroupsDto) 
+ 
+L’objet TaxGroupsDto est défini comme : 
+Champ Type Description Valeur 
+a Integer Valeur du groupe fiscal A 0 
+b Integer Valeur du groupe fiscal B 18 
+c Integer Valeur du groupe fiscal C 0 
+d Integer Valeur du groupe fiscal D 18 
+e Integer Valeur du groupe fiscal E 0 
+f Integer Valeur du groupe fiscal F 0 
+aibA Integer Valeur du groupe fiscal AIB A 1 
+aibB Integer Valeur du groupe fiscal AIB B 5 
+ 
+Exemple : 
+Demande : 
+ 
+GET /api/info/taxGroups HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+ 
+{ 
+    "a": 0, 
+    "b": 18, 
+    "c": 0, 
+    "d": 18, 
+    "e": 0, 
+    "f": 0, 
+    "aibA": 1, 
+    "aibB": 5 
+} 
+  
+
+===== PAGE 22 =====
+ 
+ 
+22 
+ 
+2.3 INFORMATIONS SUR LES TYPES DE FACTURES 
+La demande de statut est utilisée pour obtenir un statut de l’API, de jeton et de factures en attente. 
+• URL     {API_INFORMATION_URL}/invoiceTypes 
+• Method:    GET 
+• URL Params:    NONE 
+• Success Response (HTTP code 200): JSON(Array<InvoiceTypeDto>) 
+ 
+L’objet InvoiceTypeDto est défini comme : 
+Champ Type Description Valeur 
+type string Étiquette pour le type de facture FV 
+description string Description de la facture type Facture de vente 
+ 
+Exemple : 
+Demande : 
+ 
+GET /api/info/invoiceTypes HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+ 
+[ 
+    { 
+        "type": "FV", 
+        "description": "Facture de vente" 
+    }, 
+    { 
+        "type": "FA", 
+        "description": "Facture d'avoir" 
+    }, 
+    { 
+        "type": "EV", 
+        "description": "Facture de vente à l'exportation" 
+    }, 
+    { 
+        "type": "EA", 
+        "description": "Facture d'avoir à l'exportation" 
+    } 
+] 
+
+===== PAGE 23 =====
+ 
+ 
+23 
+ 
+2.4 INFORMATIONS SUR LES TYPES DE PAIEMENT 
+La demande de statut est utilisée pour obtenir un statut de l’API, de jeton et de factures en attente. 
+• URL     {API_INFORMATION_URL}/paymentTypes 
+• Method:    GET 
+• URL Params:    NONE 
+• Success Response (HTTP code 200): JSON(Array<PaymentTypeDto>) 
+ 
+L’objet PaymentTypeDto est défini comme : 
+Champ Type Description Valeur 
+type string Étiquette pour le type de paiement ESPECES 
+description string Description du type de paiement  ESPECES 
+Exemple : 
+Demande : 
+ 
+GET /api/info/paymentTypes HTTP/1.1 
+Host: XXXXXXXXXXX 
+Authorization: Bearer XXXXXXXXXXX 
+ 
+Réponse : 
+[ 
+    { 
+        "type": "ESPECES", 
+        "description": "ESPECES" 
+    }, 
+    { 
+        "type": "CHEQUES", 
+        "description": "CHEQUES" 
+    }, 
+    { 
+        "type": "MOBILEMONEY", 
+        "description": "MOBILE MONEY" 
+    }, 
+    { 
+        "type": "CARTEBANCAIRE", 
+        "description": "CARTE BANCAIRE" 
+    }, 
+    { 
+        "type": "VIREMENT", 
+        "description": "VIREMENT" 
+    }, 
+    { 
+        "type": "CREDIT", 
+        "description": "CREDIT" 
+    }, 
+    { 
+        "type": "AUTRE", 
+        "description": "AUTRE" 
+    } 
+] 
+  
+
+===== PAGE 24 =====
+ 
+ 
+24 
+ 
+ANNEXE : LISTE D’ERREURS 
+ 
+errorCode errorDesc 
+1 Le nombre maximum de factures en attente est dépassé 
+3 Type de facture n'est pas valide 
+4 La référence de la facture originale est manquante 
+5 La référence de la facture originale ne comporte pas 24 caractères 
+6 La valeur de l'AIB n'est pas valide 
+7 Le type de paiement n'est pas valide 
+8 La facture doit contenu les articles 
+9 La groupe de taxation au niveau des articles n'est pas valide 
+10 La référence de la facture originale ne peut pas être validée, veuillez réessayer plus 
+tard 
+11 La référence de la facture originale n'est pas valide (la facture originale est introuvable) 
+12 La référence de la facture originale n'est pas valide (le montant sur la facture d'avoir 
+dépassé le montant de la facture originale) 
+20 La facture n'existe pas ou elle est déjà finalisée / annulée 
+99 Erreur lors du traitement de la demande 
+ 

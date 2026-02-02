@@ -39,6 +39,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateInvoice: (id, updates) => ipcRenderer.invoke('db.updateInvoice', id, updates),
     deleteInvoice: (id) => ipcRenderer.invoke('db.deleteInvoice', id),
   },
+  emcf: {
+    listPointsOfSale: () => ipcRenderer.invoke('emcf.listPointsOfSale'),
+    upsertPointOfSale: (pos) => ipcRenderer.invoke('emcf.upsertPointOfSale', pos),
+    deletePointOfSale: (id) => ipcRenderer.invoke('emcf.deletePointOfSale', id),
+    setActivePointOfSale: (id) => ipcRenderer.invoke('emcf.setActivePointOfSale', id),
+    getActivePointOfSale: () => ipcRenderer.invoke('emcf.getActivePointOfSale'),
+    submitInvoice: (payload, options) => ipcRenderer.invoke('emcf.submitInvoice', payload, options),
+    finalizeInvoice: (uid, action, options) => ipcRenderer.invoke('emcf.finalizeInvoice', uid, action, options),
+    confirmInvoice: (uid, options) => ipcRenderer.invoke('emcf.confirmInvoice', uid, options),
+    getInvoice: (uid, options) => ipcRenderer.invoke('emcf.getInvoice', uid, options),
+    status: (options) => ipcRenderer.invoke('emcf.status', options),
+  },
   auth: {
     login: (username, password) => ipcRenderer.invoke('auth.login', username, password),
     ping: () => ipcRenderer.invoke('ping'),

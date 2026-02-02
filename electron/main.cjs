@@ -32,6 +32,57 @@ app.whenReady().then(() => {
   // initialize DB
   dbApi = dbModule.init(app);
 
+  const joinUrl = (baseUrl, p) => {
+    const b = String(baseUrl || '').replace(/\/+$/, '');
+    const pathPart = String(p || '').startsWith('/') ? String(p || '') : `/${String(p || '')}`;
+    return `${b}${pathPart}`;
+  };
+
+  const normalizeInvoiceBaseUrl = (baseUrl) => {
+    const b = String(baseUrl || '').replace(/\/+$/, '');
+    if (!b) return '';
+    if (b.endsWith('/invoice')) return b;
+    return joinUrl(b, '/invoice');
+  };
+
+  const fetchJson = async ({ url, method, token, body, timeoutMs = 25000 }) => {
+    if (typeof fetch !== 'function') throw new Error('fetch is not available in this Electron runtime');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: ctrl.signal,
+      });
+
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (e) {
+        data = text;
+      }
+
+      if (!res.ok) {
+        const msg = typeof data === 'string' ? data : (data && data.message ? data.message : `HTTP ${res.status}`);
+        const err = new Error(msg);
+        err.status = res.status;
+        err.payload = data;
+        throw err;
+      }
+
+      return data;
+    } finally {
+      clearTimeout(t);
+    }
+  };
+
   // Register IPC handlers mapping to dbApi methods with safe wrappers
   ipcMain.handle('db.getProducts', async () => dbApi.getProducts());
   ipcMain.handle('db.getClients', async () => dbApi.getClients());
@@ -163,6 +214,122 @@ app.whenReady().then(() => {
       console.error('db.addAudit error', err);
       return false;
     }
+  });
+
+  // e-MCF (DGI) POS management (never return token to renderer)
+  ipcMain.handle('emcf.listPointsOfSale', async () => {
+    try {
+      if (typeof dbApi.listEmcfPointsOfSale !== 'function') return [];
+      return dbApi.listEmcfPointsOfSale();
+    } catch (err) {
+      console.error('emcf.listPointsOfSale error', err);
+      return [];
+    }
+  });
+
+  ipcMain.handle('emcf.upsertPointOfSale', async (event, pos) => {
+    if (typeof dbApi.upsertEmcfPointOfSale !== 'function') throw new Error('e-MCF POS upsert not supported');
+    return dbApi.upsertEmcfPointOfSale(pos);
+  });
+
+  ipcMain.handle('emcf.deletePointOfSale', async (event, id) => {
+    if (typeof dbApi.deleteEmcfPointOfSale !== 'function') throw new Error('e-MCF POS delete not supported');
+    return dbApi.deleteEmcfPointOfSale(id);
+  });
+
+  ipcMain.handle('emcf.setActivePointOfSale', async (event, id) => {
+    if (typeof dbApi.setActiveEmcfPointOfSale !== 'function') throw new Error('e-MCF POS activation not supported');
+    return dbApi.setActiveEmcfPointOfSale(id);
+  });
+
+  ipcMain.handle('emcf.getActivePointOfSale', async () => {
+    try {
+      if (typeof dbApi.getActiveEmcfPointOfSale !== 'function') return null;
+      return dbApi.getActiveEmcfPointOfSale();
+    } catch (err) {
+      console.error('emcf.getActivePointOfSale error', err);
+      return null;
+    }
+  });
+
+  // e-MCF (DGI) API calls
+  const getCreds = (posId) => {
+    if (posId && typeof dbApi.getEmcfCredentialsByPosId === 'function') return dbApi.getEmcfCredentialsByPosId(posId);
+    if (typeof dbApi.getActiveEmcfCredentials === 'function') return dbApi.getActiveEmcfCredentials();
+    return null;
+  };
+
+  ipcMain.handle('emcf.submitInvoice', async (event, payload, options) => {
+    const posId = options && options.posId ? options.posId : null;
+    const creds = getCreds(posId);
+    if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
+    if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
+    const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
+    return fetchJson({ url: invoiceBaseUrl, method: 'POST', token: creds.token, body: payload });
+  });
+
+  const finalizeInvoice = async ({ uid, action, posId }) => {
+    const creds = getCreds(posId);
+    if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
+    if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
+    const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
+    const safeUid = encodeURIComponent(uid);
+    const safeAction = encodeURIComponent(action);
+    const url = joinUrl(invoiceBaseUrl, `/${safeUid}/${safeAction}`);
+    try {
+      return await fetchJson({ url, method: 'POST', token: creds.token });
+    } catch (err) {
+      const status = err && typeof err.status === 'number' ? err.status : null;
+      if (status === 404 || status === 405) {
+        try {
+          return await fetchJson({ url, method: 'PUT', token: creds.token });
+        } catch (err2) {
+          const status2 = err2 && typeof err2.status === 'number' ? err2.status : null;
+          if (status2 === 404 || status2 === 405) {
+            // Some deployments may use French action names
+            if (action === 'confirm') {
+              return finalizeInvoice({ uid, action: 'confirmer', posId });
+            }
+            if (action === 'cancel') {
+              return finalizeInvoice({ uid, action: 'annuler', posId });
+            }
+          }
+          throw err2;
+        }
+      }
+      throw err;
+    }
+  };
+
+  ipcMain.handle('emcf.finalizeInvoice', async (event, uid, action, options) => {
+    const posId = options && options.posId ? options.posId : null;
+    if (!uid) throw new Error('UID is required');
+    if (!action) throw new Error('Action is required');
+    return finalizeInvoice({ uid, action, posId });
+  });
+
+  // backward-compatible alias (confirm)
+  ipcMain.handle('emcf.confirmInvoice', async (event, uid, options) => {
+    const posId = options && options.posId ? options.posId : null;
+    return finalizeInvoice({ uid, action: 'confirm', posId });
+  });
+
+  ipcMain.handle('emcf.getInvoice', async (event, uid, options) => {
+    const posId = options && options.posId ? options.posId : null;
+    const creds = getCreds(posId);
+    if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
+    if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
+    const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
+    return fetchJson({ url: joinUrl(invoiceBaseUrl, `/${encodeURIComponent(uid)}`), method: 'GET', token: creds.token });
+  });
+
+  ipcMain.handle('emcf.status', async (event, options) => {
+    const posId = options && options.posId ? options.posId : null;
+    const creds = getCreds(posId);
+    if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
+    if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
+    const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
+    return fetchJson({ url: invoiceBaseUrl, method: 'GET', token: creds.token });
   });
 
   // Authentication handler: validate credentials against DB (bcrypt)

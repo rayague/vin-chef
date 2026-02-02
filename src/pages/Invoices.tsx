@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import db from '@/lib/db';
 import { Invoice } from '@/lib/storage';
 import { generateInvoicePDF, downloadInvoice } from '@/lib/pdf';
-import { ArrowLeft, FileText, Eye, Download } from 'lucide-react';
+import { ArrowLeft, Eye, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import PageContainer from '@/components/PageContainer';
@@ -65,20 +66,39 @@ const Invoices = () => {
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handlePreview = (invoice: Invoice) => {
+    const anyInv = invoice as unknown as Invoice & {
+      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
+      clientIFU?: string;
+      tvaRate?: number;
+      clientAddress?: string;
+      clientPhone?: string;
+      emcfStatus?: string;
+      emcfCodeMECeFDGI?: string;
+      emcfQrCode?: string;
+      emcfDateTime?: string;
+      emcfCounters?: string;
+      emcfNim?: string;
+    };
     const doc = generateInvoicePDF({
       invoiceNumber: invoice.invoiceNumber,
       date: invoice.date,
       clientName: invoice.clientName,
-      clientAddress: invoice.clientAddress || '',
-      clientPhone: invoice.clientPhone || '',
-  clientIFU: ((invoice as unknown) as Invoice & { clientIFU?: string }).clientIFU || undefined,
-  tvaRate: ((invoice as unknown) as Invoice & { tvaRate?: number }).tvaRate || undefined,
+      clientAddress: anyInv.clientAddress || '',
+      clientPhone: anyInv.clientPhone || '',
+      clientIFU: anyInv.clientIFU || undefined,
+      tvaRate: anyInv.tvaRate || undefined,
+      items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
       productName: invoice.productName,
       quantity: invoice.quantity,
       unitPrice: invoice.unitPrice,
       totalHT: invoice.totalPrice - invoice.tva,
       tva: invoice.tva,
       totalTTC: invoice.totalPrice,
+      emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
+      emcfQrCode: anyInv.emcfQrCode,
+      emcfDateTime: anyInv.emcfDateTime,
+      emcfCounters: anyInv.emcfCounters,
+      emcfNim: anyInv.emcfNim,
     });
   // Open PDF in new tab
   const url = (doc as unknown as { output: (format: string) => string }).output('bloburl');
@@ -86,20 +106,38 @@ const Invoices = () => {
   };
 
   const handleDownload = (invoice: Invoice) => {
+    const anyInv = invoice as unknown as Invoice & {
+      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
+      clientIFU?: string;
+      tvaRate?: number;
+      clientAddress?: string;
+      clientPhone?: string;
+      emcfCodeMECeFDGI?: string;
+      emcfQrCode?: string;
+      emcfDateTime?: string;
+      emcfCounters?: string;
+      emcfNim?: string;
+    };
     const doc = generateInvoicePDF({
       invoiceNumber: invoice.invoiceNumber,
       date: invoice.date,
       clientName: invoice.clientName,
-      clientAddress: invoice.clientAddress || '',
-      clientPhone: invoice.clientPhone || '',
-  clientIFU: ((invoice as unknown) as Invoice & { clientIFU?: string }).clientIFU || undefined,
-  tvaRate: ((invoice as unknown) as Invoice & { tvaRate?: number }).tvaRate || undefined,
+      clientAddress: anyInv.clientAddress || '',
+      clientPhone: anyInv.clientPhone || '',
+      clientIFU: anyInv.clientIFU || undefined,
+      tvaRate: anyInv.tvaRate || undefined,
+      items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
       productName: invoice.productName,
       quantity: invoice.quantity,
       unitPrice: invoice.unitPrice,
       totalHT: invoice.totalPrice - invoice.tva,
       tva: invoice.tva,
       totalTTC: invoice.totalPrice,
+      emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
+      emcfQrCode: anyInv.emcfQrCode,
+      emcfDateTime: anyInv.emcfDateTime,
+      emcfCounters: anyInv.emcfCounters,
+      emcfNim: anyInv.emcfNim,
     });
     downloadInvoice(invoice.invoiceNumber, doc);
   };
@@ -151,6 +189,7 @@ const Invoices = () => {
                       <TableHead>N° Facture</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Client</TableHead>
+                      <TableHead>e-MCF</TableHead>
                       <TableHead>Montant</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -161,6 +200,14 @@ const Invoices = () => {
                         <TableCell className="font-mono">{inv.invoiceNumber}</TableCell>
                         <TableCell>{format(new Date(inv.date), 'dd/MM/yyyy', { locale: fr })}</TableCell>
                         <TableCell>{inv.clientName}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const anyInv = inv as unknown as Invoice & { emcfStatus?: string; emcfCodeMECeFDGI?: string };
+                            if (!anyInv.emcfStatus && !anyInv.emcfCodeMECeFDGI) return <Badge variant="outline">—</Badge>;
+                            if (anyInv.emcfCodeMECeFDGI) return <Badge>{anyInv.emcfCodeMECeFDGI}</Badge>;
+                            return <Badge variant="secondary">{anyInv.emcfStatus}</Badge>;
+                          })()}
+                        </TableCell>
                         <TableCell className="font-semibold">{inv.totalPrice.toLocaleString('fr-FR')} FCFA</TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">

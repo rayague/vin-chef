@@ -60,9 +60,34 @@ declare global {
     login: (username: string, password: string) => Promise<{ success: boolean; user?: { id: string; username: string; role: string } }>;
   }
 
+  interface EmcfPointOfSaleSummary {
+    id: string;
+    name: string;
+    baseUrl: string;
+    hasToken: boolean;
+    tokenEncrypted: boolean;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string | null;
+  }
+
+  interface ElectronEmcfAPI {
+    listPointsOfSale: () => Promise<EmcfPointOfSaleSummary[]>;
+    upsertPointOfSale: (pos: { id: string; name: string; baseUrl: string; token?: string | null }) => Promise<unknown>;
+    deletePointOfSale: (id: string) => Promise<boolean>;
+    setActivePointOfSale: (id: string) => Promise<boolean>;
+    getActivePointOfSale: () => Promise<EmcfPointOfSaleSummary | null>;
+    submitInvoice: (payload: unknown, options?: { posId?: string | null }) => Promise<unknown>;
+    finalizeInvoice: (uid: string, action: string, options?: { posId?: string | null }) => Promise<unknown>;
+    confirmInvoice: (uid: string, options?: { posId?: string | null }) => Promise<unknown>;
+    getInvoice: (uid: string, options?: { posId?: string | null }) => Promise<unknown>;
+    status: (options?: { posId?: string | null }) => Promise<unknown>;
+  }
+
   interface Window {
     electronAPI?: {
       db?: ElectronDBAPI;
+      emcf?: ElectronEmcfAPI;
       auth?: ElectronAuthAPI;
     };
   }

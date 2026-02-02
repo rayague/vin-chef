@@ -9,86 +9,86 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Wine cellar color palette - Burgundy, Gold, Cream */
-    --background: 36 20% 96%;
-    --foreground: 0 10% 15%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 10% 15%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 10% 15%;
+    --popover-foreground: 0 0% 10%;
 
   /* Burgundy primary color (richer) */
-  --primary: 350 60% 25%; /* deep burgundy */
-  --primary-foreground: 36 20% 98%;
+  --primary: 40 61% 41%; /* deep burgundy */
+  --primary-foreground: 0 0% 10%;
 
   /* Gold secondary color (warmer) */
-  --secondary: 42 85% 48%; /* warm gold */
-  --secondary-foreground: 0 10% 15%;
+  --secondary: 0 0% 96%; /* warm gold */
+  --secondary-foreground: 0 0% 10%;
 
-    --muted: 36 20% 92%;
-    --muted-foreground: 0 10% 45%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 40 85% 55%;
-    --accent-foreground: 0 10% 15%;
+    --accent: 45 52% 54%;
+    --accent-foreground: 0 0% 10%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 36 20% 98%;
 
-    --border: 36 15% 85%;
-    --input: 36 15% 85%;
-    --ring: 0 60% 35%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: 40 61% 41%;
 
     --radius: 0.5rem;
 
     /* Sidebar colors */
-  --sidebar-background: 350 60% 18%; /* very dark burgundy */
-  --sidebar-foreground: 36 20% 98%;
-  --sidebar-primary: 42 85% 48%; /* accent gold */
-  --sidebar-primary-foreground: 0 10% 8%;
-  --sidebar-accent: 350 60% 30%;
-  --sidebar-accent-foreground: 36 20% 98%;
-  --sidebar-border: 350 60% 12%;
-  --sidebar-ring: 42 85% 48%;
+  --sidebar-background: 0 0% 6%; /* very dark burgundy */
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 40 61% 41%; /* accent gold */
+  --sidebar-primary-foreground: 0 0% 6%;
+  --sidebar-accent: 0 0% 14%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-border: 0 0% 10%;
+  --sidebar-ring: 40 61% 41%;
   }
 
   .dark {
-    --background: 0 10% 8%;
-    --foreground: 36 20% 98%;
+    --background: 0 0% 6%;
+    --foreground: 0 0% 98%;
 
-    --card: 0 10% 12%;
-    --card-foreground: 36 20% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 0 10% 12%;
-    --popover-foreground: 36 20% 98%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
 
-  --primary: 350 60% 45%;
-    --primary-foreground: 36 20% 98%;
+  --primary: 45 52% 54%;
+    --primary-foreground: 0 0% 6%;
 
-  --secondary: 42 75% 40%;
-    --secondary-foreground: 36 20% 98%;
+  --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 0 10% 18%;
-    --muted-foreground: 36 10% 65%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 70%;
 
-    --accent: 40 75% 45%;
-    --accent-foreground: 36 20% 98%;
+    --accent: 40 61% 41%;
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 36 20% 98%;
 
-    --border: 0 10% 18%;
-    --input: 0 10% 18%;
-    --ring: 0 60% 45%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 45 52% 54%;
 
-    --sidebar-background: 350 60% 8%;
-    --sidebar-foreground: 36 20% 98%;
-    --sidebar-primary: 42 75% 40%;
-    --sidebar-primary-foreground: 0 10% 8%;
-    --sidebar-accent: 350 60% 30%;
-    --sidebar-accent-foreground: 36 20% 98%;
-    --sidebar-border: 350 60% 6%;
-    --sidebar-ring: 42 75% 40%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 45 52% 54%;
+    --sidebar-primary-foreground: 0 0% 6%;
+    --sidebar-accent: 0 0% 14%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 45 52% 54%;
   }
 }
 

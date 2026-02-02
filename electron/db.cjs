@@ -5,6 +5,29 @@ const bcrypt = require('bcryptjs');
 
 let db;
 
+function getSafeStorage() {
+  try {
+    const electron = require('electron');
+    return electron && electron.safeStorage ? electron.safeStorage : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function encryptSecret(plainText) {
+  if (!plainText) return null;
+  const safeStorage = getSafeStorage();
+  if (!safeStorage || !safeStorage.isEncryptionAvailable()) return plainText;
+  return safeStorage.encryptString(String(plainText)).toString('base64');
+}
+
+function decryptSecret(value) {
+  if (!value) return null;
+  const safeStorage = getSafeStorage();
+  if (!safeStorage || !safeStorage.isEncryptionAvailable()) return String(value);
+  return safeStorage.decryptString(Buffer.from(String(value), 'base64'));
+}
+
 function ensureSchema() {
   // users
   db.prepare(
@@ -77,6 +100,19 @@ function ensureSchema() {
     )`
   ).run();
 
+  db.prepare(
+    `CREATE TABLE IF NOT EXISTS emcf_points_of_sale (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      base_url TEXT NOT NULL,
+      token TEXT,
+      token_encrypted INTEGER DEFAULT 1,
+      is_active INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT
+    )`
+  ).run();
+
   // invoice counter
   db.prepare(
     `CREATE TABLE IF NOT EXISTS invoice_counter (
@@ -107,6 +143,25 @@ function ensureSchema() {
     insertC.run('1', 'Rouges', 'Vins rouges', now);
     insertC.run('2', 'Blancs', 'Vins blancs', now);
   }
+
+  const invoiceCols = db.prepare('PRAGMA table_info(invoices)').all().map((r) => r.name);
+  const addInvoiceColIfMissing = (colName, colDef) => {
+    if (!invoiceCols.includes(colName)) {
+      db.prepare(`ALTER TABLE invoices ADD COLUMN ${colName} ${colDef}`).run();
+      invoiceCols.push(colName);
+    }
+  };
+  addInvoiceColIfMissing('emcf_uid', 'TEXT');
+  addInvoiceColIfMissing('emcf_status', 'TEXT');
+  addInvoiceColIfMissing('emcf_code_mec_e_f_dgi', 'TEXT');
+  addInvoiceColIfMissing('emcf_qr_code', 'TEXT');
+  addInvoiceColIfMissing('emcf_date_time', 'TEXT');
+  addInvoiceColIfMissing('emcf_counters', 'TEXT');
+  addInvoiceColIfMissing('emcf_nim', 'TEXT');
+  addInvoiceColIfMissing('emcf_pos_id', 'TEXT');
+  addInvoiceColIfMissing('emcf_raw_response', 'TEXT');
+  addInvoiceColIfMissing('emcf_submitted_at', 'TEXT');
+  addInvoiceColIfMissing('emcf_confirmed_at', 'TEXT');
 }
 
 function init(app) {
@@ -142,6 +197,16 @@ function init(app) {
     insertP.run('2', 'Meursault 1er Cru 2018', 'Bourgogne Blanc', 280000, 24, 'Vin blanc sec de Bourgogne', now);
     insertP.run('3', 'Champagne Dom Pérignon 2012', 'Champagne', 650000, 18, 'Champagne prestige', now);
   }
+
+  const safeJsonParse = (value) => {
+    try {
+      if (!value) return null;
+      if (typeof value !== 'string') return value;
+      return JSON.parse(value);
+    } catch (e) {
+      return null;
+    }
+  };
 
   return {
     // Users
@@ -250,7 +315,22 @@ function init(app) {
       db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(sale.quantity, sale.productId);
       return db.prepare('SELECT * FROM sales WHERE id = ?').get(sale.id);
     },
-    getSales: () => db.prepare('SELECT * FROM sales').all(),
+    getSales: () => {
+      const rows = db
+        .prepare('SELECT s.*, i.invoice_number AS invoice_number FROM sales s LEFT JOIN invoices i ON i.sale_id = s.id')
+        .all();
+      return rows.map((r) => ({
+        ...r,
+        productId: r.product_id,
+        clientId: r.client_id,
+        unitPrice: r.unit_price,
+        totalPrice: r.total_price,
+        invoiceId: r.invoice_id,
+        invoiceNumber: r.invoice_number,
+        createdBy: r.created_by,
+        createdAt: r.created_at,
+      }));
+    },
 
     // Invoices
     getNextInvoiceNumber: () => {
@@ -262,8 +342,44 @@ function init(app) {
     },
     createInvoice: (invoice) => {
       const now = new Date().toISOString();
-      db.prepare('INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(invoice.id, invoice.invoiceNumber, invoice.saleId || null, invoice.date, invoice.clientSnapshot || null, invoice.productSnapshot || null, invoice.totalPrice, invoice.tva || 0, invoice.ifu || null, invoice.immutableFlag ? 1 : 0, now);
+      const emcfUid = invoice.emcf_uid ?? invoice.emcfUid ?? null;
+      const emcfStatus = invoice.emcf_status ?? invoice.emcfStatus ?? null;
+      const emcfCode = invoice.emcf_code_mec_e_f_dgi ?? invoice.emcfCodeMECeFDGI ?? null;
+      const emcfQr = invoice.emcf_qr_code ?? invoice.emcfQrCode ?? null;
+      const emcfDateTime = invoice.emcf_date_time ?? invoice.emcfDateTime ?? null;
+      const emcfCounters = invoice.emcf_counters ?? (invoice.emcfCounters ? (typeof invoice.emcfCounters === 'string' ? invoice.emcfCounters : JSON.stringify(invoice.emcfCounters)) : null);
+      const emcfNim = invoice.emcf_nim ?? invoice.emcfNim ?? null;
+      const emcfPosId = invoice.emcf_pos_id ?? invoice.emcfPosId ?? null;
+      const emcfRawResponse = invoice.emcf_raw_response ?? (invoice.emcfRawResponse ? (typeof invoice.emcfRawResponse === 'string' ? invoice.emcfRawResponse : JSON.stringify(invoice.emcfRawResponse)) : null);
+      const emcfSubmittedAt = invoice.emcf_submitted_at ?? invoice.emcfSubmittedAt ?? null;
+      const emcfConfirmedAt = invoice.emcf_confirmed_at ?? invoice.emcfConfirmedAt ?? null;
+      db.prepare(
+        'INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, emcf_uid, emcf_status, emcf_code_mec_e_f_dgi, emcf_qr_code, emcf_date_time, emcf_counters, emcf_nim, emcf_pos_id, emcf_raw_response, emcf_submitted_at, emcf_confirmed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      )
+        .run(
+          invoice.id,
+          invoice.invoiceNumber,
+          invoice.saleId || null,
+          invoice.date,
+          invoice.clientSnapshot || null,
+          invoice.productSnapshot || null,
+          invoice.totalPrice,
+          invoice.tva || 0,
+          invoice.ifu || null,
+          invoice.immutableFlag ? 1 : 0,
+          emcfUid,
+          emcfStatus,
+          emcfCode,
+          emcfQr,
+          emcfDateTime,
+          emcfCounters,
+          emcfNim,
+          emcfPosId,
+          emcfRawResponse,
+          emcfSubmittedAt,
+          emcfConfirmedAt,
+          now
+        );
       return db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoice.id);
     },
     // Atomic operation: insert sale, decrement stock, create invoice in a single transaction
@@ -275,9 +391,45 @@ function init(app) {
           .run(s.id, s.productId, s.clientId || null, s.quantity, s.unitPrice, s.totalPrice, s.date, s.invoiceId || null, s.createdBy || null, now);
         // decrement stock
         db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(s.quantity, s.productId);
+        const emcfUid = i.emcf_uid ?? i.emcfUid ?? null;
+        const emcfStatus = i.emcf_status ?? i.emcfStatus ?? null;
+        const emcfCode = i.emcf_code_mec_e_f_dgi ?? i.emcfCodeMECeFDGI ?? null;
+        const emcfQr = i.emcf_qr_code ?? i.emcfQrCode ?? null;
+        const emcfDateTime = i.emcf_date_time ?? i.emcfDateTime ?? null;
+        const emcfCounters = i.emcf_counters ?? (i.emcfCounters ? (typeof i.emcfCounters === 'string' ? i.emcfCounters : JSON.stringify(i.emcfCounters)) : null);
+        const emcfNim = i.emcf_nim ?? i.emcfNim ?? null;
+        const emcfPosId = i.emcf_pos_id ?? i.emcfPosId ?? null;
+        const emcfRawResponse = i.emcf_raw_response ?? (i.emcfRawResponse ? (typeof i.emcfRawResponse === 'string' ? i.emcfRawResponse : JSON.stringify(i.emcfRawResponse)) : null);
+        const emcfSubmittedAt = i.emcf_submitted_at ?? i.emcfSubmittedAt ?? null;
+        const emcfConfirmedAt = i.emcf_confirmed_at ?? i.emcfConfirmedAt ?? null;
         // insert invoice
-        db.prepare('INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-          .run(i.id, i.invoiceNumber, s.id, i.date, i.clientSnapshot || null, i.productSnapshot || null, i.totalPrice, i.tva || 0, i.ifu || null, i.immutableFlag ? 1 : 0, now);
+        db.prepare(
+          'INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, emcf_uid, emcf_status, emcf_code_mec_e_f_dgi, emcf_qr_code, emcf_date_time, emcf_counters, emcf_nim, emcf_pos_id, emcf_raw_response, emcf_submitted_at, emcf_confirmed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        )
+          .run(
+            i.id,
+            i.invoiceNumber,
+            s.id,
+            i.date,
+            i.clientSnapshot || null,
+            i.productSnapshot || null,
+            i.totalPrice,
+            i.tva || 0,
+            i.ifu || null,
+            i.immutableFlag ? 1 : 0,
+            emcfUid,
+            emcfStatus,
+            emcfCode,
+            emcfQr,
+            emcfDateTime,
+            emcfCounters,
+            emcfNim,
+            emcfPosId,
+            emcfRawResponse,
+            emcfSubmittedAt,
+            emcfConfirmedAt,
+            now
+          );
       });
       try {
         tx(sale, invoice);
@@ -290,14 +442,113 @@ function init(app) {
         throw err;
       }
     },
-    getInvoices: () => db.prepare('SELECT * FROM invoices').all(),
+    getInvoices: () => {
+      const rows = db.prepare('SELECT * FROM invoices').all();
+      return rows.map((r) => {
+        const clientSnap = safeJsonParse(r.client_snapshot) || null;
+        const productSnap = safeJsonParse(r.product_snapshot) || null;
+
+        let productName = '—';
+        let quantity = 0;
+        let unitPrice = 0;
+        let items = null;
+        try {
+          if (Array.isArray(productSnap)) {
+            productName = productSnap.length > 1 ? 'Multiple produits' : (productSnap[0]?.description || productSnap[0]?.name || '—');
+            quantity = productSnap.reduce((s, it) => s + Number(it?.quantity || 0), 0);
+            unitPrice = Number(productSnap[0]?.unitPrice || productSnap[0]?.price || 0);
+            items = productSnap.map((it) => ({
+              description: it?.description || it?.name || '—',
+              quantity: Number(it?.quantity || 0),
+              unitPrice: Number(it?.unitPrice || it?.price || 0),
+              discount: it?.discount !== undefined && it?.discount !== null ? Number(it.discount) : undefined,
+            }));
+          } else if (productSnap && typeof productSnap === 'object') {
+            productName = productSnap.description || productSnap.name || '—';
+            quantity = Number(productSnap.quantity || 0);
+            unitPrice = Number(productSnap.unitPrice || productSnap.price || 0);
+            items = [{
+              description: productSnap.description || productSnap.name || '—',
+              quantity: Number(productSnap.quantity || 0),
+              unitPrice: Number(productSnap.unitPrice || productSnap.price || 0),
+              discount: productSnap.discount !== undefined && productSnap.discount !== null ? Number(productSnap.discount) : undefined,
+            }];
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        const clientName = (clientSnap && clientSnap.name) ? clientSnap.name : '—';
+        const clientIFU = (clientSnap && clientSnap.ifu) ? clientSnap.ifu : (r.ifu || undefined);
+        const clientPhone = (clientSnap && (clientSnap.phone || clientSnap.contactInfo || clientSnap.contact)) ? (clientSnap.phone || clientSnap.contactInfo || clientSnap.contact) : undefined;
+        const clientAddress = (clientSnap && clientSnap.address) ? clientSnap.address : undefined;
+
+        return {
+          ...r,
+          invoiceNumber: r.invoice_number,
+          saleId: r.sale_id,
+          date: r.date,
+          clientName,
+          clientIFU,
+          clientPhone,
+          clientAddress,
+          items: items || undefined,
+          productName,
+          quantity,
+          unitPrice,
+          totalPrice: r.total_price,
+          tva: r.tva || 0,
+          tvaRate: 18,
+          immutableFlag: r.immutable_flag === 1,
+          createdAt: r.created_at,
+          emcfUid: r.emcf_uid,
+          emcfStatus: r.emcf_status,
+          emcfCodeMECeFDGI: r.emcf_code_mec_e_f_dgi,
+          emcfQrCode: r.emcf_qr_code,
+          emcfDateTime: r.emcf_date_time,
+          emcfCounters: r.emcf_counters,
+          emcfNim: r.emcf_nim,
+          emcfPosId: r.emcf_pos_id,
+          emcfRawResponse: safeJsonParse(r.emcf_raw_response) || r.emcf_raw_response,
+          emcfSubmittedAt: r.emcf_submitted_at,
+          emcfConfirmedAt: r.emcf_confirmed_at,
+        };
+      });
+    },
     updateInvoice: (id, updates) => {
       const row = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
       if (!row) return null;
       if (row.immutable_flag === 1) throw new Error('Invoice is immutable and cannot be modified');
       const updated = { ...row, ...updates };
-      db.prepare('UPDATE invoices SET invoice_number = ?, date = ?, client_snapshot = ?, product_snapshot = ?, total_price = ?, tva = ?, ifu = ?, immutable_flag = ? WHERE id = ?')
-        .run(updated.invoice_number ?? updated.invoiceNumber, updated.date, updated.client_snapshot ?? updated.clientSnapshot, updated.product_snapshot ?? updated.productSnapshot, updated.total_price ?? updated.totalPrice, updated.tva, updated.ifu, updated.immutable_flag ?? (updated.immutableFlag ? 1 : 0), id);
+      const emcfCode =
+        updated.emcf_code_mec_e_f_dgi ??
+        updated.emcfCodeMECeFDGI ??
+        updated.emcf_code_mec_e_f_dgi;
+      db.prepare(
+        'UPDATE invoices SET invoice_number = ?, date = ?, client_snapshot = ?, product_snapshot = ?, total_price = ?, tva = ?, ifu = ?, immutable_flag = ?, emcf_uid = ?, emcf_status = ?, emcf_code_mec_e_f_dgi = ?, emcf_qr_code = ?, emcf_date_time = ?, emcf_counters = ?, emcf_nim = ?, emcf_pos_id = ?, emcf_raw_response = ?, emcf_submitted_at = ?, emcf_confirmed_at = ? WHERE id = ?'
+      )
+        .run(
+          updated.invoice_number ?? updated.invoiceNumber,
+          updated.date,
+          updated.client_snapshot ?? updated.clientSnapshot,
+          updated.product_snapshot ?? updated.productSnapshot,
+          updated.total_price ?? updated.totalPrice,
+          updated.tva,
+          updated.ifu,
+          updated.immutable_flag ?? (updated.immutableFlag ? 1 : 0),
+          updated.emcf_uid ?? updated.emcfUid,
+          updated.emcf_status ?? updated.emcfStatus,
+          emcfCode,
+          updated.emcf_qr_code ?? updated.emcfQrCode,
+          updated.emcf_date_time ?? updated.emcfDateTime,
+          updated.emcf_counters ?? (updated.emcfCounters ? (typeof updated.emcfCounters === 'string' ? updated.emcfCounters : JSON.stringify(updated.emcfCounters)) : null),
+          updated.emcf_nim ?? updated.emcfNim,
+          updated.emcf_pos_id ?? updated.emcfPosId,
+          updated.emcf_raw_response ?? (updated.emcfRawResponse ? (typeof updated.emcfRawResponse === 'string' ? updated.emcfRawResponse : JSON.stringify(updated.emcfRawResponse)) : null),
+          updated.emcf_submitted_at ?? updated.emcfSubmittedAt,
+          updated.emcf_confirmed_at ?? updated.emcfConfirmedAt,
+          id
+        );
       return db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
     },
     deleteInvoice: (id) => {
@@ -418,6 +669,75 @@ function init(app) {
         console.error('listAudits error', err);
         return [];
       }
+    },
+
+    listEmcfPointsOfSale: () => {
+      const rows = db.prepare('SELECT id, name, base_url, token, token_encrypted, is_active, created_at, updated_at FROM emcf_points_of_sale ORDER BY created_at DESC').all();
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        baseUrl: r.base_url,
+        hasToken: Boolean(r.token),
+        tokenEncrypted: r.token_encrypted === 1,
+        isActive: r.is_active === 1,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+    },
+    upsertEmcfPointOfSale: (pos) => {
+      const now = new Date().toISOString();
+      const existing = db.prepare('SELECT * FROM emcf_points_of_sale WHERE id = ?').get(pos.id);
+      const nextTokenPlain = typeof pos.token === 'string' ? pos.token : null;
+      const nextTokenEncrypted = nextTokenPlain ? encryptSecret(nextTokenPlain) : null;
+      const tokenEncryptedFlag = nextTokenPlain ? (getSafeStorage() && getSafeStorage().isEncryptionAvailable() ? 1 : 0) : (existing ? existing.token_encrypted : 1);
+      if (existing) {
+        const finalToken = nextTokenEncrypted !== null ? nextTokenEncrypted : existing.token;
+        db.prepare('UPDATE emcf_points_of_sale SET name = ?, base_url = ?, token = ?, token_encrypted = ?, updated_at = ? WHERE id = ?')
+          .run(pos.name, pos.baseUrl, finalToken, tokenEncryptedFlag, now, pos.id);
+      } else {
+        db.prepare('INSERT INTO emcf_points_of_sale (id, name, base_url, token, token_encrypted, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)')
+          .run(pos.id, pos.name, pos.baseUrl, nextTokenEncrypted, tokenEncryptedFlag, now, now);
+      }
+      return db.prepare('SELECT id, name, base_url, is_active, created_at, updated_at FROM emcf_points_of_sale WHERE id = ?').get(pos.id);
+    },
+    deleteEmcfPointOfSale: (id) => {
+      db.prepare('DELETE FROM emcf_points_of_sale WHERE id = ?').run(id);
+      return true;
+    },
+    setActiveEmcfPointOfSale: (id) => {
+      const tx = db.transaction((posId) => {
+        db.prepare('UPDATE emcf_points_of_sale SET is_active = 0').run();
+        db.prepare('UPDATE emcf_points_of_sale SET is_active = 1 WHERE id = ?').run(posId);
+      });
+      tx(id);
+      return true;
+    },
+    getActiveEmcfPointOfSale: () => {
+      const r = db.prepare('SELECT id, name, base_url, token, token_encrypted, is_active, created_at, updated_at FROM emcf_points_of_sale WHERE is_active = 1 LIMIT 1').get();
+      if (!r) return null;
+      return {
+        id: r.id,
+        name: r.name,
+        baseUrl: r.base_url,
+        hasToken: Boolean(r.token),
+        tokenEncrypted: r.token_encrypted === 1,
+        isActive: r.is_active === 1,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      };
+    },
+    getActiveEmcfCredentials: () => {
+      const r = db.prepare('SELECT base_url, token, token_encrypted FROM emcf_points_of_sale WHERE is_active = 1 LIMIT 1').get();
+      if (!r) return null;
+      const token = r.token_encrypted === 1 ? decryptSecret(r.token) : (r.token ? String(r.token) : null);
+      return { baseUrl: r.base_url, token };
+    },
+    getEmcfCredentialsByPosId: (posId) => {
+      if (!posId) return null;
+      const r = db.prepare('SELECT base_url, token, token_encrypted FROM emcf_points_of_sale WHERE id = ? LIMIT 1').get(posId);
+      if (!r) return null;
+      const token = r.token_encrypted === 1 ? decryptSecret(r.token) : (r.token ? String(r.token) : null);
+      return { baseUrl: r.base_url, token };
     },
   };
 }

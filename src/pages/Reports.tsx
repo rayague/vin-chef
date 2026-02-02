@@ -38,7 +38,7 @@ const Reports = () => {
     if (!startDate && !endDate) return out;
     const s = startDate ? new Date(startDate) : null;
     const e = endDate ? new Date(endDate) : null;
-    return sales.filter(sale => {
+    return out.filter(sale => {
       const d = sale.date ? new Date(sale.date) : new Date();
       if (s && d < s) return false;
       if (e) {
@@ -48,7 +48,7 @@ const Reports = () => {
       }
       return true;
     });
-  }, [sales, startDate, endDate]);
+  }, [sales, startDate, endDate, productFilter]);
 
   const totalRevenue = filteredSales.reduce((acc, cur) => acc + (cur.total_price ?? cur.totalPrice ?? 0), 0);
   const totalSales = filteredSales.length;
