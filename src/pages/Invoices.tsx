@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,16 +27,41 @@ const Invoices = () => {
   const [pageSize, setPageSize] = useState(10);
   const [gotoPageInput, setGotoPageInput] = useState('');
 
+  const loadInvoices = useCallback(async () => {
+    try {
+      const list = await db.getInvoices();
+      setInvoices(list as Invoice[]);
+    } catch {
+      setInvoices([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
       return;
     }
-    (async () => {
-      const list = await db.getInvoices();
-      setInvoices(list as Invoice[]);
-    })();
-  }, [user, navigate]);
+    void loadInvoices();
+
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (
+          detail.entity === 'invoices' ||
+          detail.entity === 'sales' ||
+          detail.entity === 'clients' ||
+          detail.entity === 'products'
+        ) {
+          void loadInvoices();
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
+  }, [user, navigate, loadInvoices]);
 
   // Derived filtered + paginated data
   const filtered = invoices.filter(inv => {

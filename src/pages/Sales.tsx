@@ -175,25 +175,45 @@ const Sales = () => {
     let totalDiscount = 0;
     const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }> = [];
     const normalizedItems: Array<{ productId: string; quantity: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
-    validItems.forEach(it => {
+    for (const it of validItems) {
       const prod = products.find(p => p.id === it.productId)!;
-      const q = parseInt(it.quantity);
-      const unit = prod.unitPrice;
+      const q = Number.parseInt(String(it.quantity), 10);
+      const unit = Number((prod as unknown as { unitPrice?: unknown }).unitPrice);
+
+      if (!Number.isFinite(q) || q <= 0) {
+        toast({ title: 'Erreur', description: 'Quantité invalide', variant: 'destructive' });
+        return;
+      }
+      if (!Number.isFinite(unit) || unit < 0) {
+        toast({ title: 'Erreur', description: `Prix invalide pour ${prod.name}`, variant: 'destructive' });
+        return;
+      }
+
       let discountAmount = 0;
-      const d = parseFloat(it.discount) || 0;
+      const d = Number.parseFloat(String(it.discount || '')) || 0;
       if (d > 0) {
         if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
-        else discountAmount = d;
+        else discountAmount = d * q;
       }
       const lineTotalHT = unit * q - discountAmount;
       totalHT += lineTotalHT;
       totalDiscount += discountAmount;
       itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, discount: discountAmount > 0 ? discountAmount : undefined });
       normalizedItems.push({ productId: it.productId, quantity: q, discount: d > 0 ? d : undefined, discountType: it.discountType });
-    });
+    }
+
+    if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount)) {
+      toast({ title: 'Erreur', description: 'Montants invalides (vérifie prix, quantité et remise)', variant: 'destructive' });
+      return;
+    }
 
     const tva = totalHT * 0.18;
     const totalTTC = totalHT + tva;
+
+    if (!Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
+      toast({ title: 'Erreur', description: 'Montants invalides (TVA/Total)', variant: 'destructive' });
+      return;
+    }
 
     const shouldUseEmcf = normalizeWithEmcf && emcf.isAvailable() && !!emcfActivePos;
     if (shouldUseEmcf) {
@@ -212,25 +232,38 @@ const Sales = () => {
           return;
         }
 
-        const totalHTInt = Math.round(totalHT);
+        const operatorName = users.find(u => u.id === user?.id)?.username || user?.username || '';
+
+        const emcfItems = normalizedItems.map(it => {
+          const prod = products.find(p => p.id === it.productId)!;
+          const unit = Number(prod.unitPrice);
+          const unitInt = Math.round(unit);
+
+          const d = Number(it.discount || 0);
+          let netUnit = unit;
+          if (d > 0) {
+            if (it.discountType === 'percentage') netUnit = unit * (1 - d / 100);
+            else netUnit = unit - d;
+          }
+
+          const price = Math.max(0, Math.round(netUnit));
+          return {
+            code: prod.id,
+            name: prod.name,
+            price,
+            quantity: it.quantity,
+            taxGroup: 'B',
+          };
+        });
+
+        const totalHTInt = emcfItems.reduce((s, it) => s + it.price * it.quantity, 0);
         const tvaInt = Math.round(totalHTInt * 0.18);
         const totalTTCInt = totalHTInt + tvaInt;
-
-        const operatorName = users.find(u => u.id === user?.id)?.username || user?.username || '';
 
         const payload = {
           ifu: vendorIfu,
           type: 'FV',
-          items: normalizedItems.map(it => {
-            const prod = products.find(p => p.id === it.productId)!;
-            return {
-              code: prod.id,
-              name: prod.name,
-              price: Math.round(prod.unitPrice),
-              quantity: it.quantity,
-              taxGroup: 'B',
-            };
-          }),
+          items: emcfItems,
           client: {
             ifu: (client as unknown as { ifu?: string }).ifu || undefined,
             name: client.name,
@@ -256,13 +289,11 @@ const Sales = () => {
           return;
         }
         if (typeof invAny.total === 'number' && Math.round(invAny.total) !== totalTTCInt) {
-          try {
-            await emcf.finalizeInvoice(invAny.uid, 'cancel');
-          } catch (e2) {
-            // ignore
-          }
-          toast({ title: 'Erreur', description: 'Totaux e-MCF différents: la demande a été annulée', variant: 'destructive' });
-          return;
+          toast({
+            title: 'Attention',
+            description: `Totaux e-MCF différents (e-MCF=${Math.round(invAny.total).toLocaleString('fr-FR')} / App=${totalTTCInt.toLocaleString('fr-FR')}). Vérifie puis confirme ou annule.`,
+            variant: 'destructive',
+          });
         }
 
         setEmcfPending({
@@ -285,6 +316,11 @@ const Sales = () => {
       } finally {
         setSaving(false);
       }
+      return;
+    }
+
+    if (!Number.isFinite(totalHT) || !Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
+      toast({ title: 'Erreur', description: 'Montants invalides (vérifie prix, quantité et remise)', variant: 'destructive' });
       return;
     }
 
@@ -628,26 +664,34 @@ const Sales = () => {
                           <Label className="text-sm font-semibold">Récapitulatif</Label>
                         </div>
                         {(() => {
-                          const validItems = items.filter(it => it.productId && parseInt(it.quantity) > 0);
+                          const validItems = items.filter(it => it.productId && Number.parseInt(String(it.quantity), 10) > 0);
                           if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
                           let totalHT = 0;
                           let totalDiscount = 0;
-                          validItems.forEach(it => {
+                          for (const it of validItems) {
                             const prod = products.find(p => p.id === it.productId);
-                            if (!prod) return;
-                            const q = parseInt(it.quantity);
-                            const unit = prod.unitPrice;
-                            const d = parseFloat(it.discount) || 0;
+                            if (!prod) continue;
+                            const q = Number.parseInt(String(it.quantity), 10);
+                            const unit = Number((prod as unknown as { unitPrice?: unknown }).unitPrice);
+                            if (!Number.isFinite(q) || q <= 0) continue;
+                            if (!Number.isFinite(unit) || unit < 0) continue;
+
+                            const d = Number.parseFloat(String(it.discount || '')) || 0;
                             let discountAmount = 0;
                             if (d > 0) {
                               if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
-                              else discountAmount = d;
+                              else discountAmount = d * q;
                             }
                             totalHT += unit * q - discountAmount;
                             totalDiscount += discountAmount;
-                          });
+                          }
+
                           const tva = totalHT * 0.18;
                           const totalTTC = totalHT + tva;
+
+                          if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount) || !Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
+                            return <p className="text-sm text-muted-foreground">Montants invalides (vérifie prix, quantité et remise)</p>;
+                          }
                           return (
                             <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
                               <div className="flex justify-between">

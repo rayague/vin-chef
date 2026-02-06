@@ -46,14 +46,44 @@ const StockManagement = () => {
   });
 
   const loadData = useCallback(async () => {
-    const [p, m, u] = await Promise.all([
-      db.getProducts(),
-      db.getStockMovements(),
-      db.getUsers(),
-    ]);
-    setProducts(p as Product[]);
-    setMovements((m as StockMovement[]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    setUsers((u as unknown as { id: string; username: string }[]) || []);
+    try {
+      const [p, m, u] = await Promise.all([
+        db.getProducts(),
+        db.getStockMovements(),
+        db.getUsers(),
+      ]);
+
+      const normalizedProducts = (p as Product[]).map((prod) => {
+        const anyP = prod as unknown as {
+          id: string;
+          name?: unknown;
+          category?: unknown;
+          unitPrice?: unknown;
+          stockQuantity?: unknown;
+          description?: unknown;
+        };
+        const unitPrice = Number(anyP.unitPrice);
+        const stockQuantity = Number.parseInt(String(anyP.stockQuantity ?? ''), 10);
+        return {
+          ...prod,
+          name: String(anyP.name ?? ''),
+          category: String(anyP.category ?? ''),
+          unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+          stockQuantity: Number.isFinite(stockQuantity) ? stockQuantity : 0,
+          description: String(anyP.description ?? ''),
+        } as Product;
+      });
+
+      setProducts(normalizedProducts);
+      setMovements((m as StockMovement[]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setUsers((u as unknown as { id: string; username: string }[]) || []);
+    } catch (err) {
+      logger.error('Failed to load stock management data', err);
+      setProducts([]);
+      setMovements([]);
+      setUsers([]);
+      toast({ title: 'Erreur', description: "Impossible de charger la gestion de stock", variant: 'destructive' });
+    }
   }, []);
 
   useEffect(() => {
@@ -68,6 +98,18 @@ const StockManagement = () => {
       return;
     }
     loadData();
+
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (detail.entity === 'products' || detail.entity === 'stock_movements' || detail.entity === 'users') void loadData();
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate, loadData, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {

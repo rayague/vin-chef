@@ -312,7 +312,23 @@ function init(app) {
       insert.run(sale.id, sale.productId, sale.clientId || null, sale.quantity, sale.unitPrice, sale.totalPrice, sale.date, sale.invoiceId || null, sale.createdBy || null, now);
 
       // decrement stock
-      db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(sale.quantity, sale.productId);
+      try {
+        if (sale && Array.isArray(sale.items) && sale.items.length > 0) {
+          const upd = db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?');
+          for (const it of sale.items) {
+            if (!it || !it.productId) continue;
+            const qty = Number(it.quantity);
+            if (!Number.isFinite(qty)) continue;
+            upd.run(qty, it.productId);
+          }
+        } else {
+          db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(sale.quantity, sale.productId);
+        }
+      } catch (e) {
+        // fallback to legacy single-product decrement
+        db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(sale.quantity, sale.productId);
+      }
+
       return db.prepare('SELECT * FROM sales WHERE id = ?').get(sale.id);
     },
     getSales: () => {
@@ -390,7 +406,17 @@ function init(app) {
         db.prepare('INSERT INTO sales (id, product_id, client_id, quantity, unit_price, total_price, date, invoice_id, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
           .run(s.id, s.productId, s.clientId || null, s.quantity, s.unitPrice, s.totalPrice, s.date, s.invoiceId || null, s.createdBy || null, now);
         // decrement stock
-        db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(s.quantity, s.productId);
+        if (s && Array.isArray(s.items) && s.items.length > 0) {
+          const upd = db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?');
+          for (const it of s.items) {
+            if (!it || !it.productId) continue;
+            const qty = Number(it.quantity);
+            if (!Number.isFinite(qty)) continue;
+            upd.run(qty, it.productId);
+          }
+        } else {
+          db.prepare('UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?').run(s.quantity, s.productId);
+        }
         const emcfUid = i.emcf_uid ?? i.emcfUid ?? null;
         const emcfStatus = i.emcf_status ?? i.emcfStatus ?? null;
         const emcfCode = i.emcf_code_mec_e_f_dgi ?? i.emcfCodeMECeFDGI ?? null;

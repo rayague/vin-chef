@@ -28,6 +28,8 @@ const EmcfSettings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const emcfAvailable = emcf.isAvailable();
+
   const [pointsOfSale, setPointsOfSale] = useState<EmcfPointOfSaleSummary[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -59,7 +61,7 @@ const EmcfSettings = () => {
       navigate('/login');
       return;
     }
-    if (!emcf.isAvailable()) {
+    if (!emcfAvailable) {
       toast({
         title: 'Non disponible',
         description: "L'API e-MCF est disponible uniquement dans l'application Electron.",
@@ -69,7 +71,7 @@ const EmcfSettings = () => {
       return;
     }
     void load();
-  }, [user, navigate, toast, load]);
+  }, [user, navigate, toast, load, emcfAvailable]);
 
   const resetForm = () => setForm({ name: '', baseUrl: '', token: '' });
 
@@ -87,6 +89,15 @@ const EmcfSettings = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!emcfAvailable) {
+      toast({
+        title: 'Non disponible',
+        description: "L'API e-MCF est disponible uniquement dans l'application Electron.",
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (!form.name.trim() || !form.baseUrl.trim()) {
       toast({ title: 'Erreur', description: 'Nom et URL de base sont requis', variant: 'destructive' });
@@ -185,13 +196,13 @@ const EmcfSettings = () => {
             </div>
 
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => void handleTestStatus(activePos?.id || null)} disabled={!activePos || testingPosId !== null}>
+              <Button variant="outline" onClick={() => void handleTestStatus(activePos?.id || null)} disabled={!emcfAvailable || !activePos || testingPosId !== null}>
                 Tester /status
               </Button>
 
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={openCreate}>
+                  <Button onClick={openCreate} disabled={!emcfAvailable}>
                     <Plus className="w-4 h-4 mr-2" />
                     Nouveau
                   </Button>
@@ -203,15 +214,15 @@ const EmcfSettings = () => {
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="pos-name">Nom *</Label>
-                      <Input id="pos-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="PDV Cotonou" />
+                      <Input id="pos-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="PDV Cotonou" disabled={!emcfAvailable} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="pos-base-url">Base URL *</Label>
-                      <Input id="pos-base-url" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} placeholder="https://api.dgi..." />
+                      <Input id="pos-base-url" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} placeholder="https://api.dgi..." disabled={!emcfAvailable} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="pos-token">Token JWT {editing ? '(laisser vide pour ne pas changer)' : ''}</Label>
-                      <Input id="pos-token" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} placeholder={editing ? '••••••••' : 'eyJhbGci...'} />
+                      <Input id="pos-token" value={form.token} onChange={(e) => setForm({ ...form, token: e.target.value })} placeholder={editing ? '••••••••' : 'eyJhbGci...'} disabled={!emcfAvailable} />
                     </div>
                     <div className="flex gap-2 justify-end">
                       <Button
@@ -225,7 +236,7 @@ const EmcfSettings = () => {
                       >
                         Annuler
                       </Button>
-                      <Button type="submit">{editing ? 'Mettre à jour' : 'Ajouter'}</Button>
+                      <Button type="submit" disabled={!emcfAvailable}>{editing ? 'Mettre à jour' : 'Ajouter'}</Button>
                     </div>
                   </form>
                 </DialogContent>
@@ -235,6 +246,11 @@ const EmcfSettings = () => {
         </CardHeader>
 
         <CardContent>
+          {!emcfAvailable && (
+            <div className="mb-4 rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+              L'e-MCF est disponible uniquement dans l'application Electron. Lance l'application via <span className="font-medium">npm run electron:dev</span> en développement, ou via l'exécutable en production.
+            </div>
+          )}
           {loading ? (
             <div className="text-sm text-muted-foreground">Chargement…</div>
           ) : pointsOfSale.length === 0 ? (
@@ -294,10 +310,10 @@ const EmcfSettings = () => {
                           <Button size="sm" variant="outline" onClick={() => void handleTestStatus(p.id)} disabled={testingPosId !== null}>
                             Tester
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => openEdit(p)}>
+                          <Button size="sm" variant="outline" onClick={() => openEdit(p)} disabled={!emcfAvailable}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(p.id)}>
+                          <Button size="sm" variant="destructive" onClick={() => setDeleteTarget(p.id)} disabled={!emcfAvailable}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>

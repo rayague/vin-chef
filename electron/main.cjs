@@ -253,15 +253,49 @@ app.whenReady().then(() => {
   });
 
   // e-MCF (DGI) API calls
-  const getCreds = (posId) => {
+  const normalizeEnvToken = (token) => {
+    const raw = String(token || '').trim();
+    if (!raw) return '';
+    return raw.toLowerCase().startsWith('bearer ') ? raw.slice(7).trim() : raw;
+  };
+
+  const getCredsFromDb = (posId) => {
     if (posId && typeof dbApi.getEmcfCredentialsByPosId === 'function') return dbApi.getEmcfCredentialsByPosId(posId);
     if (typeof dbApi.getActiveEmcfCredentials === 'function') return dbApi.getActiveEmcfCredentials();
     return null;
   };
 
+  const resolveEmcfCreds = (posId) => {
+    const dbCreds = getCredsFromDb(posId);
+
+    const envModeRaw = String(process.env.EMCF_CREDENTIALS_MODE || '').trim().toLowerCase();
+    const envMode = envModeRaw === 'override' || envModeRaw === 'fallback' ? envModeRaw : 'fallback';
+
+    const envBaseUrl = String(process.env.EMCF_BASE_URL || '').trim();
+    const envToken = normalizeEnvToken(process.env.EMCF_TOKEN);
+    const hasEnv = !!envBaseUrl || !!envToken;
+
+    if (!hasEnv) return dbCreds;
+
+    if (envMode === 'override') {
+      return {
+        ...(dbCreds || {}),
+        ...(envBaseUrl ? { baseUrl: envBaseUrl } : {}),
+        ...(envToken ? { token: envToken } : {}),
+      };
+    }
+
+    // fallback: only fill missing pieces from env
+    return {
+      ...(dbCreds || {}),
+      ...(!dbCreds?.baseUrl && envBaseUrl ? { baseUrl: envBaseUrl } : {}),
+      ...(!dbCreds?.token && envToken ? { token: envToken } : {}),
+    };
+  };
+
   ipcMain.handle('emcf.submitInvoice', async (event, payload, options) => {
     const posId = options && options.posId ? options.posId : null;
-    const creds = getCreds(posId);
+    const creds = resolveEmcfCreds(posId);
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
     if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
     const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
@@ -269,7 +303,7 @@ app.whenReady().then(() => {
   });
 
   const finalizeInvoice = async ({ uid, action, posId }) => {
-    const creds = getCreds(posId);
+    const creds = resolveEmcfCreds(posId);
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
     if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
     const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
@@ -316,7 +350,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('emcf.getInvoice', async (event, uid, options) => {
     const posId = options && options.posId ? options.posId : null;
-    const creds = getCreds(posId);
+    const creds = resolveEmcfCreds(posId);
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
     if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
     const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
@@ -325,7 +359,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('emcf.status', async (event, options) => {
     const posId = options && options.posId ? options.posId : null;
-    const creds = getCreds(posId);
+    const creds = resolveEmcfCreds(posId);
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
     if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
     const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);

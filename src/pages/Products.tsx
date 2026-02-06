@@ -21,6 +21,7 @@ const Products = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -40,21 +41,22 @@ const Products = () => {
       navigate('/login');
       return;
     }
-    loadProducts();
+    void loadProducts();
     (async () => {
       try {
         const cats = await db.getCategories();
         const typed = cats as Array<{ id: string; name: string }> | undefined;
         setCategories((typed || []).map(c => ({ id: c.id, name: c.name })));
       } catch (err) {
-        // ignore
+        logger.error('Failed to load categories', err);
+        setCategories([]);
       }
     })();
     const handler = (ev: Event) => {
       try {
         const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
         if (!detail) return;
-        if (detail.entity === 'products' || detail.entity === 'categories' || detail.entity === 'stock_movements') loadProducts();
+        if (detail.entity === 'products' || detail.entity === 'categories' || detail.entity === 'stock_movements') void loadProducts();
       } catch (e) {
         // ignore
       }
@@ -64,8 +66,36 @@ const Products = () => {
   }, [user, navigate]);
 
   const loadProducts = async () => {
-    const list = await db.getProducts();
-    setProducts(list as Product[]);
+    try {
+      setLoadError(null);
+      const list = await db.getProducts();
+      const normalized = (list as Product[]).map((p) => {
+        const anyP = p as unknown as {
+          id: string;
+          name?: unknown;
+          category?: unknown;
+          unitPrice?: unknown;
+          stockQuantity?: unknown;
+          description?: unknown;
+        };
+        const unitPrice = Number(anyP.unitPrice);
+        const stockQuantity = Number.parseInt(String(anyP.stockQuantity ?? ''), 10);
+        return {
+          ...p,
+          name: String(anyP.name ?? ''),
+          category: String(anyP.category ?? ''),
+          unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+          stockQuantity: Number.isFinite(stockQuantity) ? stockQuantity : 0,
+          description: String(anyP.description ?? ''),
+        } as Product;
+      });
+      setProducts(normalized);
+    } catch (err) {
+      logger.error('Failed to load products', err);
+      setProducts([]);
+      setLoadError("Impossible de charger les produits. Vérifie que la base de données Electron est disponible.");
+      toast({ title: 'Erreur', description: "Impossible de charger les produits", variant: 'destructive' });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -135,10 +165,12 @@ const Products = () => {
     resetForm();
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(product => {
+    const name = String((product as unknown as { name?: unknown }).name ?? '').toLowerCase();
+    const category = String((product as unknown as { category?: unknown }).category ?? '').toLowerCase();
+    const q = searchTerm.toLowerCase();
+    return name.includes(q) || category.includes(q);
+  });
 
   return (
     <PageContainer>
@@ -244,6 +276,11 @@ const Products = () => {
             </div>
           </CardHeader>
           <CardContent>
+            {loadError && (
+              <div className="mb-4 rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+                {loadError}
+              </div>
+            )}
             {filteredProducts.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>

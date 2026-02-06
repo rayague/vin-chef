@@ -83,7 +83,18 @@ export const db = {
   async getProducts() {
     if (isElectronDBAvailable()) {
       const res = await (window as unknown as Window).electronAPI!.db!.getProducts();
-      return res as StorageProduct[];
+      const list = (res as unknown as Array<Record<string, unknown>>) || [];
+      return list.map((p) => {
+        const unitPriceRaw = (p as { unitPrice?: unknown; unit_price?: unknown }).unitPrice ?? (p as { unit_price?: unknown }).unit_price;
+        const stockQtyRaw = (p as { stockQuantity?: unknown; stock_quantity?: unknown }).stockQuantity ?? (p as { stock_quantity?: unknown }).stock_quantity;
+        const unitPrice = Number(unitPriceRaw);
+        const stockQuantity = Number.parseInt(String(stockQtyRaw ?? ''), 10);
+        return {
+          ...(p as unknown as StorageProduct),
+          unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+          stockQuantity: Number.isFinite(stockQuantity) ? stockQuantity : 0,
+        } as StorageProduct;
+      });
     }
     // try IndexedDB first, then localStorage
     try {
@@ -97,7 +108,9 @@ export const db = {
 
   async addProduct(product: StorageProduct) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.addProduct) {
-      return (window as unknown as Window).electronAPI!.db!.addProduct(product);
+      const res = await (window as unknown as Window).electronAPI!.db!.addProduct(product);
+      emitChange({ entity: 'products', action: 'add', id: product.id });
+      return res;
     }
     try {
       await idb.idbPut('products', product);
@@ -111,7 +124,9 @@ export const db = {
   },
   async updateProduct(id: string, updates: Partial<StorageProduct>) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.updateProduct) {
-      return (window as unknown as Window).electronAPI!.db!.updateProduct(id, updates);
+      const res = await (window as unknown as Window).electronAPI!.db!.updateProduct(id, updates);
+      emitChange({ entity: 'products', action: 'update', id });
+      return res;
     }
     try {
       const existing = await idb.idbGet<StorageProduct>('products', id);
@@ -129,7 +144,9 @@ export const db = {
 
   async deleteProduct(id: string) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.deleteProduct) {
-      return (window as unknown as Window).electronAPI!.db!.deleteProduct(id);
+      const res = await (window as unknown as Window).electronAPI!.db!.deleteProduct(id);
+      emitChange({ entity: 'products', action: 'delete', id });
+      return res;
     }
     try {
       await idb.idbDelete('products', id);
@@ -173,7 +190,9 @@ export const db = {
 
   async addCategory(category: { id: string; name: string; description?: string }) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.addCategory) {
-      return (window as unknown as Window).electronAPI!.db!.addCategory(category);
+      const res = await (window as unknown as Window).electronAPI!.db!.addCategory(category);
+      emitChange({ entity: 'categories', action: 'add', id: category.id });
+      return res;
     }
     try {
       await idb.idbPut('categories', category);
@@ -188,7 +207,9 @@ export const db = {
 
   async updateCategory(id: string, updates: Partial<{ id: string; name: string; description?: string }>) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.updateCategory) {
-      return (window as unknown as Window).electronAPI!.db!.updateCategory(id, updates);
+      const res = await (window as unknown as Window).electronAPI!.db!.updateCategory(id, updates);
+      emitChange({ entity: 'categories', action: 'update', id });
+      return res;
     }
     try {
       const existing = await idb.idbGet<{ id: string; name: string; description?: string }>('categories', id);
@@ -206,7 +227,9 @@ export const db = {
 
   async deleteCategory(id: string) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.deleteCategory) {
-      return (window as unknown as Window).electronAPI!.db!.deleteCategory(id);
+      const res = await (window as unknown as Window).electronAPI!.db!.deleteCategory(id);
+      emitChange({ entity: 'categories', action: 'delete', id });
+      return res;
     }
     try {
       await idb.idbDelete('categories', id);
@@ -221,7 +244,9 @@ export const db = {
 
   async addClient(client: StorageClient) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.addClient) {
-      return (window as unknown as Window).electronAPI!.db!.addClient(client);
+      const res = await (window as unknown as Window).electronAPI!.db!.addClient(client);
+      emitChange({ entity: 'clients', action: 'add', id: client.id });
+      return res;
     }
     try {
       await idb.idbPut('clients', client);
@@ -236,7 +261,9 @@ export const db = {
 
   async updateClient(id: string, updates: Partial<StorageClient>) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.updateClient) {
-      return (window as unknown as Window).electronAPI!.db!.updateClient(id, updates);
+      const res = await (window as unknown as Window).electronAPI!.db!.updateClient(id, updates);
+      emitChange({ entity: 'clients', action: 'update', id });
+      return res;
     }
   try {
     const existing = await idb.idbGet<StorageClient>('clients', id);
@@ -254,7 +281,9 @@ export const db = {
 
   async deleteClient(id: string) {
     if (isElectronDBAvailable() && (window as unknown as Window).electronAPI!.db!.deleteClient) {
-      return (window as unknown as Window).electronAPI!.db!.deleteClient(id);
+      const res = await (window as unknown as Window).electronAPI!.db!.deleteClient(id);
+      emitChange({ entity: 'clients', action: 'delete', id });
+      return res;
     }
     try {
       await idb.idbDelete('clients', id);
@@ -286,6 +315,19 @@ export const db = {
       const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
       if (api && typeof api.addSale === 'function') {
         const res = await api.addSale(sale);
+        emitChange({ entity: 'sales', action: 'add', id: sale.id });
+        try {
+          const itemsArr = (sale as unknown as { items?: Array<{ productId: string; quantity: number }> }).items;
+          if (itemsArr && itemsArr.length > 0) {
+            for (const it of itemsArr) {
+              if (it?.productId) emitChange({ entity: 'products', action: 'update', id: it.productId });
+            }
+          } else {
+            emitChange({ entity: 'products', action: 'update', id: sale.productId });
+          }
+        } catch (e) {
+          // ignore
+        }
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, (sale as unknown as StorageSale).createdBy || undefined, { sale });
         } catch (err) {
@@ -393,6 +435,7 @@ export const db = {
       const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
       if (api && typeof api.addInvoice === 'function') {
         const res = await api.addInvoice(invoice);
+        emitChange({ entity: 'invoices', action: 'add', id: invoice.id });
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'invoice', invoice.id, (invoice as unknown as StorageInvoice).createdBy || undefined, { invoice });
         } catch (err) {
@@ -429,6 +472,21 @@ export const db = {
       const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
       if (api && typeof api.createSaleWithInvoice === 'function') {
         const res = await api.createSaleWithInvoice(sale, invoice);
+        emitChange({ entity: 'sales', action: 'add', id: sale.id });
+        emitChange({ entity: 'invoices', action: 'add', id: invoice.id });
+        try {
+          const itemsArr = (sale as unknown as { items?: Array<{ productId: string; quantity: number }> }).items;
+          if (itemsArr && itemsArr.length > 0) {
+            for (const it of itemsArr) {
+              if (it?.productId) emitChange({ entity: 'products', action: 'update', id: it.productId });
+            }
+          } else {
+            emitChange({ entity: 'products', action: 'update', id: sale.productId });
+          }
+          emitChange({ entity: 'stock_movements', action: 'add' });
+        } catch (e) {
+          // ignore
+        }
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'sale', sale.id, (sale as unknown as StorageSale).createdBy || undefined, { sale, invoice });
         } catch (err) {
@@ -635,6 +693,7 @@ export const db = {
       const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
       if (api && typeof api.addStockMovement === 'function') {
         const res = await api.addStockMovement(movement);
+        emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'stock_movement', movement.id, (movement as unknown as import('./storage').StockMovement).createdBy || undefined, { movement });
         } catch (err) {
