@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import db from '@/lib/db';
 import { Invoice } from '@/lib/storage';
-import { generateInvoicePDF, downloadInvoice } from '@/lib/pdf';
+import { generateInvoicePDF, downloadInvoice, getInvoiceLogoDataUrl } from '@/lib/pdf';
 import { ArrowLeft, Eye, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -90,7 +90,7 @@ const Invoices = () => {
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const handlePreview = (invoice: Invoice) => {
+  const handlePreview = async (invoice: Invoice) => {
     const anyInv = invoice as unknown as Invoice & {
       items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
       clientIFU?: string;
@@ -104,6 +104,7 @@ const Invoices = () => {
       emcfCounters?: string;
       emcfNim?: string;
     };
+    const logoDataUrl = await getInvoiceLogoDataUrl();
     const doc = generateInvoicePDF({
       invoiceNumber: invoice.invoiceNumber,
       date: invoice.date,
@@ -119,6 +120,7 @@ const Invoices = () => {
       totalHT: invoice.totalPrice - invoice.tva,
       tva: invoice.tva,
       totalTTC: invoice.totalPrice,
+      logoDataUrl: logoDataUrl || undefined,
       emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
       emcfQrCode: anyInv.emcfQrCode,
       emcfDateTime: anyInv.emcfDateTime,
@@ -130,7 +132,7 @@ const Invoices = () => {
   window.open(url, '_blank');
   };
 
-  const handleDownload = (invoice: Invoice) => {
+  const handleDownload = async (invoice: Invoice) => {
     const anyInv = invoice as unknown as Invoice & {
       items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
       clientIFU?: string;
@@ -143,6 +145,7 @@ const Invoices = () => {
       emcfCounters?: string;
       emcfNim?: string;
     };
+    const logoDataUrl = await getInvoiceLogoDataUrl();
     const doc = generateInvoicePDF({
       invoiceNumber: invoice.invoiceNumber,
       date: invoice.date,
@@ -158,6 +161,7 @@ const Invoices = () => {
       totalHT: invoice.totalPrice - invoice.tva,
       tva: invoice.tva,
       totalTTC: invoice.totalPrice,
+      logoDataUrl: logoDataUrl || undefined,
       emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
       emcfQrCode: anyInv.emcfQrCode,
       emcfDateTime: anyInv.emcfDateTime,

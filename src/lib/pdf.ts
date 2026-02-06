@@ -10,6 +10,7 @@ export interface InvoiceData {
   clientAddress?: string;
   clientPhone?: string;
   clientIFU?: string;
+  logoDataUrl?: string;
   emcfCodeMECeFDGI?: string;
   emcfQrCode?: string;
   emcfDateTime?: string;
@@ -38,9 +39,35 @@ const COMPANY_INFO = {
   country: 'Bénin',
   phone: '+229 21 00 00 00',
   email: 'contact@cavepremium.bj',
-  ifu: '0123456789012', // IFU (Identifiant Fiscal Unique) - Bénin (13 chiffres)
+  ifu: '0202368226611',
+  nim: 'TS01017752',
   rcs: 'RC/ESE/2025/0001', // Registre du Commerce et des Sociétés
-  tvaNumber: '0123456789012', // Numéro de TVA (souvent identique à l'IFU au Bénin)
+  tvaNumber: '0202368226611',
+};
+
+let cachedInvoiceLogoDataUrl: string | null | undefined;
+
+export const getInvoiceLogoDataUrl = async (): Promise<string | null> => {
+  if (cachedInvoiceLogoDataUrl !== undefined) return cachedInvoiceLogoDataUrl;
+  try {
+    const res = await fetch('/logo_vin.jpeg');
+    if (!res.ok) {
+      cachedInvoiceLogoDataUrl = null;
+      return null;
+    }
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read logo'));
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.readAsDataURL(blob);
+    });
+    cachedInvoiceLogoDataUrl = dataUrl || null;
+    return cachedInvoiceLogoDataUrl;
+  } catch {
+    cachedInvoiceLogoDataUrl = null;
+    return null;
+  }
 };
 // Helper to format numbers for PDF: replace narrow no-break space (U+202F)
 // which some locales use as thousands separator (e.g. fr-FR) with a
@@ -60,26 +87,43 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
 
   // Colors
   const primary: [number, number, number] = [40, 40, 40];
-  const accent: [number, number, number] = [128, 24, 24];
+  const accent: [number, number, number] = [184, 134, 11];
 
-  // Header: company left, invoice meta right
+  // Header: logo + company left, invoice meta right
+  const headerTop = 12;
+  const logoSize = 18;
+  const invoiceBoxX = 130;
+  const invoiceBoxY = 12;
+  const invoiceBoxW = 65;
+  const invoiceBoxH = 56;
+  if (data.logoDataUrl) {
+    try {
+      doc.addImage(data.logoDataUrl, 'JPEG', 15, headerTop + 2, logoSize, logoSize);
+    } catch {
+      // ignore
+    }
+  }
+
+  const companyX = data.logoDataUrl ? 15 + logoSize + 4 : 15;
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(COMPANY_INFO.name, 15, 20);
+  doc.text(COMPANY_INFO.name, companyX, 20);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${COMPANY_INFO.address}`, 15, 25);
-  doc.text(`${COMPANY_INFO.city} - ${COMPANY_INFO.country}`, 15, 29);
-  doc.text(`Tél: ${COMPANY_INFO.phone}`, 15, 33);
-  doc.text(`Email: ${COMPANY_INFO.email}`, 15, 37);
-  doc.text(`IFU: ${COMPANY_INFO.ifu}`, 15, 41);
-  doc.text(`N° TVA: ${COMPANY_INFO.tvaNumber}`, 15, 45);
-  doc.text(`RCS: ${COMPANY_INFO.rcs}`, 15, 49);
+  doc.text(`${COMPANY_INFO.address}`, companyX, 25);
+  doc.text(`${COMPANY_INFO.city} - ${COMPANY_INFO.country}`, companyX, 29);
+  doc.text(`Tél: ${COMPANY_INFO.phone}`, companyX, 33);
+  doc.text(`Email: ${COMPANY_INFO.email}`, companyX, 37);
+  doc.text(`IFU: ${COMPANY_INFO.ifu}`, companyX, 41);
+  doc.text(`NIM: ${COMPANY_INFO.nim}`, companyX, 45);
+  doc.text(`RCS: ${COMPANY_INFO.rcs}`, companyX, 49);
+  doc.text(`N° TVA: ${COMPANY_INFO.tvaNumber}`, companyX, 53);
+  const companyBottomY = 53;
 
   // Invoice box on the right
   doc.setDrawColor(accent[0], accent[1], accent[2]);
   doc.setFillColor(245, 245, 245);
-  doc.rect(130, 12, 65, 38, 'FD');
+  doc.rect(invoiceBoxX, invoiceBoxY, invoiceBoxW, invoiceBoxH, 'FD');
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primary[0], primary[1], primary[2]);
@@ -100,54 +144,95 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
 
   // e-MCF info (when available)
   if (data.emcfCodeMECeFDGI || data.emcfQrCode || data.emcfNim || data.emcfCounters || data.emcfDateTime) {
-    doc.setFontSize(8);
+    const boxTop = invoiceBoxY;
+    const boxHeight = invoiceBoxH;
+    const boxBottom = boxTop + boxHeight;
+
+    const emcfX = 135;
+    const emcfMaxWidth = 58;
+
+    const writeLines = (lines: string[], yStart: number) => {
+      let y = yStart;
+      for (let i = 0; i < lines.length; i++) {
+        if (y > boxBottom - 3) return { y, truncated: true };
+        doc.text(lines[i], emcfX, y);
+        y += 3.5;
+      }
+      return { y, truncated: false };
+    };
+
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(accent[0], accent[1], accent[2]);
-    doc.text('e-MCF', 135, 47);
+    doc.text('e-MCF', emcfX, 46);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(primary[0], primary[1], primary[2]);
-    let emcfY = 51;
+    let emcfY = 49;
     if (data.emcfCodeMECeFDGI) {
-      doc.text(`Code: ${data.emcfCodeMECeFDGI}`, 135, emcfY);
-      emcfY += 4;
+      const lines = doc.splitTextToSize(`Code: ${data.emcfCodeMECeFDGI}`, emcfMaxWidth) as string[];
+      const r = writeLines(lines, emcfY);
+      emcfY = r.y;
     }
     if (data.emcfDateTime) {
-      doc.text(`Date/Heure: ${data.emcfDateTime}`, 135, emcfY);
-      emcfY += 4;
+      const lines = doc.splitTextToSize(`Date/Heure: ${data.emcfDateTime}`, emcfMaxWidth) as string[];
+      const r = writeLines(lines, emcfY);
+      emcfY = r.y;
     }
     if (data.emcfNim) {
-      doc.text(`NIM: ${data.emcfNim}`, 135, emcfY);
-      emcfY += 4;
+      const lines = doc.splitTextToSize(`NIM: ${data.emcfNim}`, emcfMaxWidth) as string[];
+      const r = writeLines(lines, emcfY);
+      emcfY = r.y;
     }
     if (data.emcfCounters) {
-      doc.text(`Compteurs: ${data.emcfCounters}`, 135, emcfY);
-      emcfY += 4;
+      const lines = doc.splitTextToSize(`Compteurs: ${data.emcfCounters}`, emcfMaxWidth) as string[];
+      const r = writeLines(lines, emcfY);
+      emcfY = r.y;
     }
     if (data.emcfQrCode) {
       const qr = String(data.emcfQrCode);
-      const short = qr.length > 64 ? `${qr.slice(0, 64)}…` : qr;
-      doc.text(`QR: ${short}`, 135, emcfY);
+      const short = qr.length > 72 ? `${qr.slice(0, 72)}…` : qr;
+      const lines = doc.splitTextToSize(`QR: ${short}`, emcfMaxWidth) as string[];
+      const r = writeLines(lines, emcfY);
+      if (r.truncated) {
+        doc.text('…', emcfX, boxBottom - 2);
+      }
     }
   }
 
   // Buyer / Client information
+  const headerBottomY = Math.max(companyBottomY, invoiceBoxY + invoiceBoxH);
+  const clientStartY = headerBottomY + 10;
+
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('Facturer à / Client :', 15, 60);
+  doc.text('Facturer à / Client :', 15, clientStartY);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.clientName, 15, 66);
-  if (data.clientAddress) doc.text(data.clientAddress, 15, 71);
-  if (data.clientPhone) doc.text(`Tél: ${data.clientPhone}`, 15, 76);
+  let clientY = clientStartY + 6;
+  doc.text(data.clientName, 15, clientY);
+  clientY += 5;
+  if (data.clientAddress) {
+    const lines = doc.splitTextToSize(String(data.clientAddress), 100) as string[];
+    doc.text(lines, 15, clientY);
+    clientY += 4 * lines.length;
+  }
+  if (data.clientPhone) {
+    doc.text(`Tél: ${data.clientPhone}`, 15, clientY);
+    clientY += 5;
+  }
   if (data.clientIFU) {
-    doc.text(`IFU client: ${data.clientIFU}`, 15, 81);
+    doc.text(`IFU client: ${data.clientIFU}`, 15, clientY);
+    clientY += 4;
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
-    doc.text('(Client assujetti à la TVA)', 15, 85);
+    doc.text('(Client assujetti à la TVA)', 15, clientY);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    clientY += 5;
   }
 
   // Table header and rows
-  const tableStartY = 92;
+  const tableStartY = Math.max(clientY + 6, clientStartY + 26);
 
   const tvaRate = data.tvaRate ?? 18;
 
@@ -182,12 +267,12 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     body: rows,
     theme: 'grid',
     headStyles: { fillColor: [accent[0], accent[1], accent[2]] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold' },
-    styles: { fontSize: 9 },
+    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
     columnStyles: {
-      0: { cellWidth: 70 },
+      0: { cellWidth: 62 },
       1: { cellWidth: 15 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 30 },
+      2: { cellWidth: 28 },
+      3: { cellWidth: 28 },
       4: { cellWidth: 15 },
       5: { cellWidth: 30 },
     },
@@ -197,13 +282,38 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   const finalY = last ? last.finalY + 8 : tableStartY + 30;
 
   // Totals block
-  const totalsX = 130;
-  let y = finalY;
+  const totalsBoxX = 110;
+  const totalsBoxW = 85;
+  const totalsBoxTop = finalY;
+  const totalsLineH = 6;
+  const hasDiscount = Boolean(data.discount && data.discount > 0);
+  const totalsPadTop = 10;
+  const totalsPadBottom = 6;
+  const totalsLinesBeforeSeparator = hasDiscount ? 4 : 2; // HT, (remise, HT après remise), TVA
+  const totalsExtraAfterTva = totalsLineH; // corresponds to: y += totalsLineH (before drawing separator)
+  const totalsExtraAfterSeparator = totalsLineH + 1; // corresponds to: y += totalsLineH + 1 (after drawing separator)
+  const totalsLinesAfterSeparator = 1; // TTC
+  const totalsBoxH =
+    totalsPadTop +
+    totalsLinesBeforeSeparator * totalsLineH +
+    totalsExtraAfterTva +
+    totalsExtraAfterSeparator +
+    totalsLinesAfterSeparator * totalsLineH +
+    totalsPadBottom;
+
+  doc.setDrawColor(accent[0], accent[1], accent[2]);
+  doc.setLineWidth(0.5);
+  doc.setFillColor(248, 248, 248);
+  doc.rect(totalsBoxX, totalsBoxTop, totalsBoxW, totalsBoxH, 'FD');
+
+  const totalsLabelX = totalsBoxX + 6;
+  const totalsValueX = totalsBoxX + totalsBoxW - 6;
+  let y = totalsBoxTop + totalsPadTop;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Total HT', totalsX, y);
-  doc.text(`${formatCurrency(data.totalHT)} FCFA`, 195, y, { align: 'right' });
-  y += 6;
+  doc.text('Total HT', totalsLabelX, y);
+  doc.text(`${formatCurrency(data.totalHT)} FCFA`, totalsValueX, y, { align: 'right' });
+  y += totalsLineH;
 
   // Afficher la remise si applicable
   if (data.discount && data.discount > 0) {
@@ -211,28 +321,33 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     const discountLabel = data.discountType === 'percentage' 
       ? `Remise (${((data.discount / data.totalHT) * 100).toFixed(1)}%)`
       : 'Remise';
-    doc.text(discountLabel, totalsX, y);
-    doc.text(`- ${formatCurrency(data.discount)} FCFA`, 195, y, { align: 'right' });
+    doc.text(discountLabel, totalsLabelX, y);
+    doc.text(`- ${formatCurrency(data.discount)} FCFA`, totalsValueX, y, { align: 'right' });
     doc.setTextColor(primary[0], primary[1], primary[2]); // Reset couleur
-    y += 6;
+    y += totalsLineH;
     
     // Total HT après remise
     const totalHTAfterDiscount = data.totalHT - data.discount;
-    doc.text('Total HT après remise', totalsX, y);
-    doc.text(`${formatCurrency(totalHTAfterDiscount)} FCFA`, 195, y, { align: 'right' });
-    y += 6;
+    doc.text('Total HT après remise', totalsLabelX, y);
+    doc.text(`${formatCurrency(totalHTAfterDiscount)} FCFA`, totalsValueX, y, { align: 'right' });
+    y += totalsLineH;
   }
 
-  doc.text(`TVA (${tvaRate}%)`, totalsX, y);
-  doc.text(`${formatCurrency(data.tva)} FCFA`, 195, y, { align: 'right' });
-  y += 8;
+  doc.text(`TVA (${tvaRate}%)`, totalsLabelX, y);
+  doc.text(`${formatCurrency(data.tva)} FCFA`, totalsValueX, y, { align: 'right' });
+  y += totalsLineH;
+
+  doc.setDrawColor(210, 210, 210);
+  doc.setLineWidth(0.2);
+  doc.line(totalsBoxX + 6, y + 1, totalsBoxX + totalsBoxW - 6, y + 1);
+  y += totalsLineH + 1;
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Total TTC', totalsX, y);
-  doc.text(`${formatCurrency(data.totalTTC)} FCFA`, 195, y, { align: 'right' });
+  doc.text('Total TTC', totalsLabelX, y);
+  doc.text(`${formatCurrency(data.totalTTC)} FCFA`, totalsValueX, y, { align: 'right' });
 
   // Payment information box
-  const paymentY = y + 12;
+  const paymentY = totalsBoxTop + totalsBoxH + 10;
   doc.setDrawColor(accent[0], accent[1], accent[2]);
   doc.setLineWidth(0.5);
   doc.rect(15, paymentY, 85, 35);
@@ -253,16 +368,36 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
 
   // Signature block
   const sigY = paymentY;
+  const sigBoxX = 110;
+  const sigBoxW = 85;
+  const sigBoxH = 35;
+  doc.setDrawColor(accent[0], accent[1], accent[2]);
+  doc.setLineWidth(0.5);
+  doc.rect(sigBoxX, sigY, sigBoxW, sigBoxH);
+
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Fait à : ' + COMPANY_INFO.city, 110, sigY + 6);
-  doc.text('Le : ' + format(new Date(data.date), 'dd/MM/yyyy', { locale: fr }), 110, sigY + 11);
+  doc.setTextColor(primary[0], primary[1], primary[2]);
+  doc.text(`Fait à : ${COMPANY_INFO.city}`, sigBoxX + 4, sigY + 7);
+  doc.text(`Le : ${format(new Date(data.date), 'dd/MM/yyyy', { locale: fr })}`, sigBoxX + 4, sigY + 12);
+  doc.setDrawColor(210, 210, 210);
+  doc.setLineWidth(0.2);
+  doc.line(sigBoxX + 4, sigY + 15, sigBoxX + sigBoxW - 4, sigY + 15);
   doc.setFont('helvetica', 'bold');
-  doc.text('Signature et cachet du fournisseur', 110, sigY + 18);
-  doc.rect(110, sigY + 20, 85, 25); // signature box
+  doc.text('Signature et cachet du fournisseur', sigBoxX + sigBoxW / 2, sigY + 20, { align: 'center' });
+  doc.setDrawColor(accent[0], accent[1], accent[2]);
+  doc.setLineWidth(0.3);
+  doc.rect(sigBoxX + 4, sigY + 22, sigBoxW - 8, sigBoxH - 26); // signature box
 
   // Legal footer with OHADA compliance
-  const footerY = 270;
+  const pageHeight = (doc as unknown as { internal: { pageSize: { getHeight: () => number } } }).internal.pageSize.getHeight();
+  const footerTopMargin = 12;
+  const minFooterY = Math.max(paymentY + 35, sigY + sigBoxH) + 10;
+  let footerY = Math.max(minFooterY, 240);
+  if (footerY + 26 > pageHeight - footerTopMargin) {
+    doc.addPage();
+    footerY = 20;
+  }
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.text('MENTIONS LÉGALES OBLIGATOIRES', 15, footerY);
@@ -285,7 +420,8 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.setFontSize(6);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(150, 150, 150);
-  doc.text(`Document généré électroniquement le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })} | ${COMPANY_INFO.name}`, 105, 292, { align: 'center' });
+  const footerBottomY = Math.min(pageHeight - 5, footerY + 22);
+  doc.text(`Document généré électroniquement le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })} | ${COMPANY_INFO.name}`, 105, footerBottomY, { align: 'center' });
 
   return doc;
 };
