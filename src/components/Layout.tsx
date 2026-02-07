@@ -65,9 +65,15 @@ const Layout = () => {
 
         <nav className="p-4 space-y-2">
           <div className="flex justify-end mb-2">
-            <button aria-label="Basculer la sidebar" onClick={() => setCollapsed(!collapsed)} className="p-1 rounded hover:bg-[hsl(var(--sidebar-border))]">
+            <Button
+              aria-label="Basculer la sidebar"
+              variant="ghost"
+              size="icon"
+              onClick={() => setCollapsed(!collapsed)}
+              className="h-8 w-8 text-sidebar-foreground hover:bg-sidebar-primary/15"
+            >
               {collapsed ? '▶' : '◀'}
-            </button>
+            </Button>
           </div>
           <div className="space-y-1">
             <TooltipProvider>

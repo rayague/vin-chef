@@ -14,7 +14,8 @@
     "electron:build": "vite build && electron-builder",
     "electron:package": "electron-builder -mwl",
     "test": "vitest",
-    "test:integration": "vitest --run --dir test/integration --environment node"
+    "test:integration": "vitest --run --dir test/integration --environment node",
+    "emcf:test": "node ./run_tests_emcf.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

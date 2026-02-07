@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rapport tests e-MECeF</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;margin:24px;color:#222}
+    .cards{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+    .card{border:1px solid #ddd;border-radius:10px;padding:12px 14px;min-width:160px;background:#fafafa}
+    .k{font-size:12px;color:#555}
+    .v{font-size:20px;font-weight:800}
+    table{border-collapse:collapse;width:100%;margin-top:18px}
+    th,td{border:1px solid #e2e2e2;padding:10px;font-size:13px;vertical-align:top}
+    th{background:#f3f3f3;text-align:left}
+    .muted{color:#666}
+    .top{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .h1{font-size:20px;font-weight:900}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <div class="h1">Rapport de validation e‑MECeF</div>
+      <div class="muted">Run ID: 2026-02-07T01-10-57-319Z_test | Date: 2026-02-07T01:11:08.730Z</div>
+      <div class="muted">Environnement: test | Base URL: https://developper.impots.bj/sygmef-emcf</div>
+    </div>
+    <div class="muted">App: Vin-Chef SFE v0.0.0 (node)</div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="k">Total</div><div class="v">15</div></div>
+    <div class="card"><div class="k">PASS</div><div class="v" style="color:#0f7b0f">13</div></div>
+    <div class="card"><div class="k">FAIL</div><div class="v" style="color:#b00020">0</div></div>
+    <div class="card"><div class="k">SKIPPED</div><div class="v" style="color:#555">2</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Test ID</th>
+        <th>Catégorie</th>
+        <th>Env</th>
+        <th>Nom</th>
+        <th>Statut</th>
+        <th>UID</th>
+        <th>Erreur</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>EMCF-STATUS-01</td>
+        <td>Connexion</td>
+        <td>test</td>
+        <td>Status e-MECeF</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-INVOICE-01</td>
+        <td>Facturation</td>
+        <td>test</td>
+        <td>Soumission facture vente (FV)</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td>554ac303-290e-4336-93a3-49b8937281ea</td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-CLIENT-01</td>
+        <td>Client</td>
+        <td>test</td>
+        <td>Validation IFU client valide</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-CLIENT-02</td>
+        <td>Client</td>
+        <td>test</td>
+        <td>Rejet IFU client invalide</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-AIB-01</td>
+        <td>AIB</td>
+        <td>test</td>
+        <td>AIB 0%</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-AIB-02</td>
+        <td>AIB</td>
+        <td>test</td>
+        <td>AIB 1%</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-AIB-03</td>
+        <td>AIB</td>
+        <td>test</td>
+        <td>AIB 5%</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-PAIEMENT-01</td>
+        <td>Paiement</td>
+        <td>test</td>
+        <td>Paiement non ESPECES</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-FACTURE-03</td>
+        <td>Facturation</td>
+        <td>test</td>
+        <td>Facture d'avoir (AV)</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-FACTURE-04</td>
+        <td>Facturation</td>
+        <td>test</td>
+        <td>Facture export vente</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-DESC-01</td>
+        <td>Description</td>
+        <td>test</td>
+        <td>Description supplémentaire</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-MSG-01</td>
+        <td>Message</td>
+        <td>test</td>
+        <td>Message commercial</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-ARTICLE-01</td>
+        <td>Articles</td>
+        <td>test</td>
+        <td>Ajout article préprogrammé</td>
+        <td style="color:#555;font-weight:700">SKIPPED</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-ARTICLE-02</td>
+        <td>Articles</td>
+        <td>test</td>
+        <td>Ajout article non préprogrammé</td>
+        <td style="color:#555;font-weight:700">SKIPPED</td>
+        <td></td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+<tr>
+        <td>EMCF-INVOICE-02</td>
+        <td>Facturation</td>
+        <td>test</td>
+        <td>Finalisation + récupération facture</td>
+        <td style="color:#0f7b0f;font-weight:700">PASS</td>
+        <td>554ac303-290e-4336-93a3-49b8937281ea</td>
+        <td style="max-width:520px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="muted" style="margin-top:16px">Astuce: ouvre le JSON du run pour voir les réponses brutes (status/submit/getInvoice) et diagnostiquer les erreurs.</p>
+</body>
+</html>

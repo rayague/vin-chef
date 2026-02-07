@@ -41,8 +41,11 @@ app.whenReady().then(() => {
   const normalizeInvoiceBaseUrl = (baseUrl) => {
     const b = String(baseUrl || '').replace(/\/+$/, '');
     if (!b) return '';
-    if (b.endsWith('/invoice')) return b;
-    return joinUrl(b, '/invoice');
+    // Official SDK endpoints are under /api/invoice
+    if (b.endsWith('/api/invoice')) return b;
+    // Backward compatibility with older configs
+    if (b.endsWith('/invoice')) return joinUrl(b.replace(/\/invoice$/, ''), '/api/invoice');
+    return joinUrl(b, '/api/invoice');
   };
 
   const fetchJson = async ({ url, method, token, body, timeoutMs = 25000 }) => {

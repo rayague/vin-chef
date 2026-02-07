@@ -1,0 +1,889 @@
+{
+  "run_id": "2026-02-07T01-10-57-319Z_test",
+  "generated_at": "2026-02-07T01:11:08.730Z",
+  "app": {
+    "name": "Vin-Chef SFE",
+    "version": "0.0.0",
+    "platform": "node",
+    "operator": "Automated Test"
+  },
+  "environment": {
+    "name": "test",
+    "base_url": "https://developper.impots.bj/sygmef-emcf"
+  },
+  "summary": {
+    "total": 15,
+    "pass": 13,
+    "fail": 0,
+    "skipped": 2,
+    "duration_seconds": 0
+  },
+  "tests": [
+    {
+      "test_id": "EMCF-STATUS-01",
+      "test_nom": "Status e-MECeF",
+      "test_categorie": "Connexion",
+      "description": "Valider que /status répond et que le token est accepté.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:10:57.321Z",
+      "ended_at": "2026-02-07T01:10:58.695Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [
+          "GET (détection HTML/JSON) + résolution URL API"
+        ],
+        "resultats_attendu": "Endpoint e-MECeF répond en JSON (pas HTML).",
+        "resultats_obtenu": "Endpoint API détecté: https://developper.impots.bj/sygmef-emcf/api/invoice",
+        "erreur": null,
+        "screenshots": [],
+        "attempts": [
+          {
+            "url": "https://developper.impots.bj/sygmef-emcf/invoice",
+            "ok": false,
+            "status": 404
+          },
+          {
+            "url": "https://developper.impots.bj/sygmef-emcf/api/invoice",
+            "ok": true,
+            "html": false
+          }
+        ],
+        "raw": {
+          "status": true,
+          "version": "1.0",
+          "ifu": "0202368226611",
+          "nim": "TS01017752",
+          "tokenValid": "2026-08-05T18:38:07.523+01:00",
+          "serverDateTime": "2026-02-07T02:10:57.9866672+01:00",
+          "pendingRequestsCount": 0,
+          "pendingRequestsList": []
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": null
+      }
+    },
+    {
+      "test_id": "EMCF-INVOICE-01",
+      "test_nom": "Soumission facture vente (FV)",
+      "test_categorie": "Facturation",
+      "description": "Soumettre une facture de vente minimale et vérifier le retour UID.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:10:58.695Z",
+      "ended_at": "2026-02-07T01:10:59.602Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice submitted. UID=554ac303-290e-4336-93a3-49b8937281ea",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "554ac303-290e-4336-93a3-49b8937281ea",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": "554ac303-290e-4336-93a3-49b8937281ea",
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-CLIENT-01",
+      "test_nom": "Validation IFU client valide",
+      "test_categorie": "Client",
+      "description": "Soumettre une facture avec un IFU client valide et vérifier l'acceptation.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:10:59.602Z",
+      "ended_at": "2026-02-07T01:11:00.213Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with valid IFU submitted. UID=a01cd287-52dd-445b-a711-1065ec7f7b9c",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "a01cd287-52dd-445b-a711-1065ec7f7b9c",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": "0202368226611",
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-CLIENT-02",
+      "test_nom": "Rejet IFU client invalide",
+      "test_categorie": "Client",
+      "description": "Tenter de soumettre une facture avec un IFU client invalide et vérifier le rejet.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:00.213Z",
+      "ended_at": "2026-02-07T01:11:00.831Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with invalid IFU submitted (API may not validate IFU). UID=9dfacd16-297b-461f-b965-a479feb7c6e7",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "9dfacd16-297b-461f-b965-a479feb7c6e7",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": "9999999999999",
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-AIB-01",
+      "test_nom": "AIB 0%",
+      "test_categorie": "AIB",
+      "description": "Soumettre une facture avec AIB 0% et vérifier l'acceptation.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:00.831Z",
+      "ended_at": "2026-02-07T01:11:01.364Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with AIB 0% submitted. UID=abcdc8bd-98a8-4ee7-802f-96e570796a29",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "abcdc8bd-98a8-4ee7-802f-96e570796a29",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-AIB-02",
+      "test_nom": "AIB 1%",
+      "test_categorie": "AIB",
+      "description": "Soumettre une facture avec AIB 1% et vérifier l'acceptation.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:01.364Z",
+      "ended_at": "2026-02-07T01:11:01.904Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with AIB 1% submitted. UID=607eb119-65e4-4ecb-a1b8-e8891cf7a1f1",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "607eb119-65e4-4ecb-a1b8-e8891cf7a1f1",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-AIB-03",
+      "test_nom": "AIB 5%",
+      "test_categorie": "AIB",
+      "description": "Soumettre une facture avec AIB 5% et vérifier l'acceptation.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:01.904Z",
+      "ended_at": "2026-02-07T01:11:02.484Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with AIB 5% submitted. UID=0ee52869-9c26-4cc4-8759-f63d2ca886c3",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "0ee52869-9c26-4cc4-8759-f63d2ca886c3",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-PAIEMENT-01",
+      "test_nom": "Paiement non ESPECES",
+      "test_categorie": "Paiement",
+      "description": "Soumettre une facture avec un mode de paiement autre que ESPECES.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:02.484Z",
+      "ended_at": "2026-02-07T01:11:03.019Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with payment mode BANK_TRANSFER submitted. UID=c5e32016-0f62-4f57-8c71-51038b7fdd0d",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "c5e32016-0f62-4f57-8c71-51038b7fdd0d",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-FACTURE-03",
+      "test_nom": "Facture d'avoir (AV)",
+      "test_categorie": "Facturation",
+      "description": "Soumettre une facture d'avoir avec référence à la facture originale.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:03.019Z",
+      "ended_at": "2026-02-07T01:11:06.153Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Avoir soumis. type=FA ref=reference=confirm.codeMECeFDGI UID=c98b8874-59a1-4678-a4f8-842516c439b9",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "info": {
+            "ok": false,
+            "url": "https://developper.impots.bj/sygmef-emcf/api/info/invoice-types",
+            "error": "HTTP 404 Not Found",
+            "status": 404,
+            "response": {
+              "_raw": "\r\n<!DOCTYPE html>\r\n<html lang=\"en\">\r\n<head>\r\n        \r\n    <!-- Google tag (gtag.js) -->\r\n    <script async src=\"https://www.googletagmanager.com/gtag/js?id=G-RTX3ZSBY20\"></script>\r\n    <script>\r\n      window.dataLayer = window.dataLayer || [];\r\n      function gtag(){dataLayer.push(arguments);}\r\n      gtag('js', new Date());\r\n\r\n      gtag('config', 'G-RTX3ZSBY20');\r\n    </script>\r\n    <meta charset=\"utf-8\" />\r\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\r\n    <title>e-MECeF</title>\r\n    <link rel=\"stylesheet\" href=\"/sygmef-emcf/lib/bootstrap/dist/css/bootstrap.min.css\" />\r\n    <link rel=\"stylesheet\" href=\"/sygmef-emcf/css/site.css\" />\r\n    <link rel=\"stylesheet\" href=\"/sygmef-emcf/lib/fontawesome/css/all.min.css\" />\r\n    <link rel=\"shortcut icon\" href=\"/sygmef-emcf/favicon.ico\" />\r\n\r\n</head>\r\n<body>\r\n    <header>\r\n        <nav class=\"navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3\">\r\n            <div class=\"container\">\r\n                <a class=\"navbar-brand\" href=\"/sygmef-emcf\">e-MECeF</a>\r\n                <button class=\"navbar-toggler\" type=\"button\" data-toggle=\"collapse\" data-target=\".navbar-collapse\" aria-controls=\"navbarSupportedContent\"\r\n                        aria-expanded=\"false\" aria-label=\"Toggle navigation\">\r\n                    <span class=\"navbar-toggler-icon\"></span>\r\n                </button>\r\n            </div>\r\n        </nav>\r\n    </header>\r\n\r\n    <div class=\"container\">\r\n        <main role=\"main\" class=\"pb-3\">\r\n            <br />\r\n<br />\r\n<div class=\"alert alert-danger\">\r\n    <h1>Erreur - page introuvable</h1>\r\n</div>\r\n        </main>\r\n    </div>\r\n\r\n    <footer class=\"border-top footer text-muted\">\r\n        <div class=\"container\">\r\n            <div class=\"row\">\r\n                <div class=\"col-md-6\">\r\n                    &copy; 2026 - DGI Bénin\r\n                </div>\r\n                <div class=\"col-md-6 text-right\">\r\n                </div>\r\n            </div>\r\n        </div>\r\n    </footer>\r\n    <script src=\"/sygmef-emcf/lib/jquery/dist/jquery.min.js\"></script>\r\n    <script src=\"/sygmef-emcf/lib/bootstrap/dist/js/bootstrap.bundle.min.js\"></script>\r\n    \r\n\r\n    <script>\r\n        $(document).ready(function () {\r\n            $('.toast').toast('show');\r\n\r\n            //re enable form submit\r\n            function reEnableSubmit() {\r\n                $(\"input[type=submit]\").attr(\"disabled\", false);\r\n            }\r\n\r\n            //disable form submit\r\n            $(\"form\").submit(function (e) {\r\n                $(\"input[type=submit]\").attr(\"disabled\", true);\r\n                setTimeout(reEnableSubmit, 3000);\r\n                return true;\r\n            });\r\n\r\n        });\r\n    </script>\r\n</body>\r\n</html>\r\n"
+            }
+          },
+          "usedType": "FA",
+          "usedReferenceVariant": "reference=confirm.codeMECeFDGI",
+          "response": {
+            "uid": "c98b8874-59a1-4678-a4f8-842516c439b9",
+            "ta": 0,
+            "tb": 18,
+            "tc": 0,
+            "td": 18,
+            "taa": 0,
+            "tab": 1180,
+            "tac": 0,
+            "tad": 0,
+            "tae": 0,
+            "taf": 0,
+            "hab": 1000,
+            "had": 0,
+            "vab": 180,
+            "vad": 0,
+            "aib": 0,
+            "ts": 0,
+            "total": 1180
+          },
+          "originalDetails": {
+            "ifu": "0202368226611",
+            "type": "FV",
+            "items": [
+              {
+                "name": "Test Article e-MECeF",
+                "price": 1180,
+                "quantity": 1,
+                "taxGroup": "B"
+              }
+            ],
+            "client": {},
+            "operator": {
+              "name": "Test Operator"
+            },
+            "payment": [
+              {
+                "name": "ESPECES",
+                "amount": 1180
+              }
+            ]
+          },
+          "originalConfirm": {
+            "dateTime": "07/02/2026 02:11:03",
+            "qrCode": "F;TS01017752;TESTP3XJUKE47WVLS2EVVMLH;0202368226611;20260207021103",
+            "codeMECeFDGI": "TEST-P3XJ-UKE4-7WVL-S2EV-VMLH",
+            "counters": "63/64 FV",
+            "nim": "TS01017752",
+            "refundWithAibPayment": false
+          },
+          "attempts": [
+            {
+              "phase": "type-detect",
+              "type": "FA",
+              "ok": false,
+              "error": "API error 4: La référence de la facture originale est manquante",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "4",
+                "errorDesc": "La référence de la facture originale est manquante"
+              }
+            },
+            {
+              "phase": "type-detect",
+              "type": "AV",
+              "ok": false,
+              "error": "API error 3: Type de facture n'est pas valide",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "3",
+                "errorDesc": "Type de facture n'est pas valide"
+              }
+            },
+            {
+              "phase": "type-detect",
+              "type": "AF",
+              "ok": false,
+              "error": "API error 3: Type de facture n'est pas valide",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "3",
+                "errorDesc": "Type de facture n'est pas valide"
+              }
+            },
+            {
+              "phase": "type-detect",
+              "type": "FV_AV",
+              "ok": false,
+              "error": "API error 3: Type de facture n'est pas valide",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "3",
+                "errorDesc": "Type de facture n'est pas valide"
+              }
+            },
+            {
+              "phase": "type-detect",
+              "type": "AVOIR",
+              "ok": false,
+              "error": "API error 3: Type de facture n'est pas valide",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "3",
+                "errorDesc": "Type de facture n'est pas valide"
+              }
+            },
+            {
+              "phase": "reference-try",
+              "type": "FA",
+              "referenceVariant": "reference=uid",
+              "ok": false,
+              "error": "API error 5: La référence de la facture originale ne comporte pas 24 caractères",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "5",
+                "errorDesc": "La référence de la facture originale ne comporte pas 24 caractères"
+              }
+            },
+            {
+              "phase": "reference-try",
+              "type": "FA",
+              "referenceVariant": "reference=confirm.nim",
+              "ok": false,
+              "error": "API error 5: La référence de la facture originale ne comporte pas 24 caractères",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "5",
+                "errorDesc": "La référence de la facture originale ne comporte pas 24 caractères"
+              }
+            },
+            {
+              "phase": "reference-try",
+              "type": "FA",
+              "referenceVariant": "reference=confirm.counters",
+              "ok": false,
+              "error": "API error 5: La référence de la facture originale ne comporte pas 24 caractères",
+              "api": {
+                "ta": 0,
+                "tb": 0,
+                "tc": 0,
+                "td": 0,
+                "taa": 0,
+                "tab": 0,
+                "tac": 0,
+                "tad": 0,
+                "tae": 0,
+                "taf": 0,
+                "hab": 0,
+                "had": 0,
+                "vab": 0,
+                "vad": 0,
+                "aib": 0,
+                "ts": 0,
+                "total": 0,
+                "errorCode": "5",
+                "errorDesc": "La référence de la facture originale ne comporte pas 24 caractères"
+              }
+            },
+            {
+              "phase": "reference-try",
+              "type": "FA",
+              "referenceVariant": "reference=confirm.codeMECeFDGI",
+              "ok": true,
+              "uid": "c98b8874-59a1-4678-a4f8-842516c439b9"
+            }
+          ]
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": -1180
+      }
+    },
+    {
+      "test_id": "EMCF-FACTURE-04",
+      "test_nom": "Facture export vente",
+      "test_categorie": "Facturation",
+      "description": "Soumettre une facture de vente à l'exportation (TVA 0%).",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:06.153Z",
+      "ended_at": "2026-02-07T01:11:06.684Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Export invoice (FV) submitted. UID=70b8c509-dac6-4cd9-8d93-f34073466722",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "70b8c509-dac6-4cd9-8d93-f34073466722",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 1000,
+          "tab": 0,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 0,
+          "had": 0,
+          "vab": 0,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1000
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1000
+      }
+    },
+    {
+      "test_id": "EMCF-DESC-01",
+      "test_nom": "Description supplémentaire",
+      "test_categorie": "Description",
+      "description": "Soumettre une facture avec une description sur 3 lignes.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:06.684Z",
+      "ended_at": "2026-02-07T01:11:07.281Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with description submitted. UID=4c2269ea-9e50-4b14-a5ad-09b87915bf92",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "4c2269ea-9e50-4b14-a5ad-09b87915bf92",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-MSG-01",
+      "test_nom": "Message commercial",
+      "test_categorie": "Message",
+      "description": "Soumettre une facture avec un message commercial en pied de page.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:07.281Z",
+      "ended_at": "2026-02-07T01:11:07.843Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Invoice with commercial message submitted. UID=79a06b60-17e4-47ce-b74e-fd24675443a2",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "uid": "79a06b60-17e4-47ce-b74e-fd24675443a2",
+          "ta": 0,
+          "tb": 18,
+          "tc": 0,
+          "td": 18,
+          "taa": 0,
+          "tab": 1180,
+          "tac": 0,
+          "tad": 0,
+          "tae": 0,
+          "taf": 0,
+          "hab": 1000,
+          "had": 0,
+          "vab": 180,
+          "vad": 0,
+          "aib": 0,
+          "ts": 0,
+          "total": 1180
+        }
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": 1180
+      }
+    },
+    {
+      "test_id": "EMCF-ARTICLE-01",
+      "test_nom": "Ajout article préprogrammé",
+      "test_categorie": "Articles",
+      "description": "Créer un article préprogrammé via API.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:07.843Z",
+      "ended_at": "2026-02-07T01:11:08.016Z",
+      "statut": "SKIPPED",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Endpoint Articles non exposé (404/HTML). Test ignoré.",
+        "erreur": null,
+        "screenshots": []
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": null
+      }
+    },
+    {
+      "test_id": "EMCF-ARTICLE-02",
+      "test_nom": "Ajout article non préprogrammé",
+      "test_categorie": "Articles",
+      "description": "Créer un article non préprogrammé via API.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:08.016Z",
+      "ended_at": "2026-02-07T01:11:08.182Z",
+      "statut": "SKIPPED",
+      "details": {
+        "etapes": [],
+        "resultats_attendu": "",
+        "resultats_obtenu": "Endpoint Articles non exposé (404/HTML). Test ignoré.",
+        "erreur": null,
+        "screenshots": []
+      },
+      "donnees_test": {
+        "facture_uid": null,
+        "client_ifu": null,
+        "montant": null
+      }
+    },
+    {
+      "test_id": "EMCF-INVOICE-02",
+      "test_nom": "Finalisation + récupération facture",
+      "test_categorie": "Facturation",
+      "description": "Confirmer ou annuler une facture soumise puis récupérer les détails.",
+      "environnement": "test",
+      "date_execution": "2026-02-07T01:11:08.182Z",
+      "ended_at": "2026-02-07T01:11:08.730Z",
+      "statut": "PASS",
+      "details": {
+        "etapes": [
+          "POST /invoice/{uid}/cancel (fallback PUT si 404/405)",
+          "GET /invoice/{uid}"
+        ],
+        "resultats_attendu": "Finalisation accepte la facture (confirm/cancel) et GET retourne les informations.",
+        "resultats_obtenu": "Invoice cancel OK + GET OK",
+        "erreur": null,
+        "screenshots": [],
+        "raw": {
+          "finalize": {
+            "errorCode": "20",
+            "errorDesc": "La facture n'existe pas ou elle est déjà finalisée / annulée",
+            "refundWithAibPayment": false
+          },
+          "invoice": {
+            "ifu": null,
+            "type": "NA",
+            "items": null,
+            "client": null,
+            "operator": null,
+            "payment": null,
+            "errorCode": "20",
+            "errorDesc": "La facture n'existe pas ou elle est déjà finalisée / annulée"
+          }
+        }
+      },
+      "donnees_test": {
+        "facture_uid": "554ac303-290e-4336-93a3-49b8937281ea",
+        "client_ifu": null,
+        "montant": null
+      }
+    }
+  ],
+  "recommendations": []
+}
