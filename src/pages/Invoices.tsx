@@ -10,11 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import db from '@/lib/db';
 import { Invoice } from '@/lib/storage';
 import { generateInvoicePDF, downloadInvoice, getInvoiceLogoDataUrl } from '@/lib/pdf';
-import { ArrowLeft, Eye, Download } from 'lucide-react';
+import { ArrowLeft, Eye, Download, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import PageContainer from '@/components/PageContainer';
 import PageHeader from '@/components/PageHeader';
+import InvoiceDetailsModal from '@/pages/InvoiceDetailsModal';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { qrCodeCache } from '@/lib/qr-cache';
 
 const Invoices = () => {
   const { user } = useAuth();
@@ -26,6 +29,9 @@ const Invoices = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [gotoPageInput, setGotoPageInput] = useState('');
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsInvoice, setDetailsInvoice] = useState<Invoice | null>(null);
+  const [isGeneratingPdfId, setIsGeneratingPdfId] = useState<string | null>(null);
 
   const loadInvoices = useCallback(async () => {
     try {
@@ -104,6 +110,24 @@ const Invoices = () => {
       emcfCounters?: string;
       emcfNim?: string;
     };
+
+    let emcfQrCodeDataUrl: string | undefined;
+    if (anyInv.emcfQrCode) {
+      console.log('Facture', invoice.invoiceNumber, 'emcfQrCode present:', anyInv.emcfQrCode);
+      try {
+        setIsGeneratingPdfId(String(invoice.id));
+        emcfQrCodeDataUrl = await qrCodeCache.getDataUrl(String(anyInv.emcfQrCode), { margin: 1, width: 300 });
+        console.log('QR dataURL generated, length:', emcfQrCodeDataUrl.length);
+      } catch {
+        console.warn('Failed to generate QR dataURL for', invoice.invoiceNumber);
+        emcfQrCodeDataUrl = undefined;
+      } finally {
+        setIsGeneratingPdfId(null);
+      }
+    } else {
+      console.log('Facture', invoice.invoiceNumber, 'NO emcfQrCode field');
+    }
+
     const logoDataUrl = await getInvoiceLogoDataUrl();
     const doc = generateInvoicePDF({
       invoiceNumber: invoice.invoiceNumber,
@@ -123,6 +147,7 @@ const Invoices = () => {
       logoDataUrl: logoDataUrl || undefined,
       emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
       emcfQrCode: anyInv.emcfQrCode,
+      emcfQrCodeDataUrl,
       emcfDateTime: anyInv.emcfDateTime,
       emcfCounters: anyInv.emcfCounters,
       emcfNim: anyInv.emcfNim,
@@ -145,6 +170,19 @@ const Invoices = () => {
       emcfCounters?: string;
       emcfNim?: string;
     };
+
+    let emcfQrCodeDataUrl: string | undefined;
+    if (anyInv.emcfQrCode) {
+      try {
+        setIsGeneratingPdfId(String(invoice.id));
+        emcfQrCodeDataUrl = await qrCodeCache.getDataUrl(String(anyInv.emcfQrCode), { margin: 1, width: 300 });
+      } catch {
+        emcfQrCodeDataUrl = undefined;
+      } finally {
+        setIsGeneratingPdfId(null);
+      }
+    }
+
     const logoDataUrl = await getInvoiceLogoDataUrl();
     const doc = generateInvoicePDF({
       invoiceNumber: invoice.invoiceNumber,
@@ -164,11 +202,17 @@ const Invoices = () => {
       logoDataUrl: logoDataUrl || undefined,
       emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
       emcfQrCode: anyInv.emcfQrCode,
+      emcfQrCodeDataUrl,
       emcfDateTime: anyInv.emcfDateTime,
       emcfCounters: anyInv.emcfCounters,
       emcfNim: anyInv.emcfNim,
     });
     downloadInvoice(invoice.invoiceNumber, doc);
+  };
+
+  const openDetails = (invoice: Invoice) => {
+    setDetailsInvoice(invoice);
+    setDetailsOpen(true);
   };
 
   return (
@@ -240,10 +284,14 @@ const Invoices = () => {
                         <TableCell className="font-semibold">{inv.totalPrice.toLocaleString('fr-FR')} FCFA</TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
-                            <Button size="sm" variant="ghost" onClick={() => handlePreview(inv)} aria-label={`Prévisualiser la facture ${inv.invoiceNumber}`}>
+                            {isGeneratingPdfId === String(inv.id) ? <LoadingSpinner size="sm" message="Génération PDF..." /> : null}
+                            <Button size="sm" variant="ghost" onClick={() => openDetails(inv)} aria-label={`Détails de la facture ${inv.invoiceNumber}`}>
+                              <Search className="w-4 h-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => handlePreview(inv)} aria-label={`Prévisualiser la facture ${inv.invoiceNumber}`} disabled={isGeneratingPdfId !== null}>
                               <Eye className="w-4 h-4" />
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => handleDownload(inv)} aria-label={`Télécharger la facture ${inv.invoiceNumber}`}>
+                            <Button size="sm" variant="outline" onClick={() => handleDownload(inv)} aria-label={`Télécharger la facture ${inv.invoiceNumber}`} disabled={isGeneratingPdfId !== null}>
                               <Download className="w-4 h-4" />
                             </Button>
                           </div>
@@ -311,6 +359,17 @@ const Invoices = () => {
           </div>
           </CardContent>
         </Card>
+
+      <InvoiceDetailsModal
+        open={detailsOpen}
+        onOpenChange={(open) => {
+          setDetailsOpen(open);
+          if (!open) setDetailsInvoice(null);
+        }}
+        invoice={detailsInvoice as unknown as (Invoice & { items?: Array<{ description?: string; name?: string; quantity: number; unitPrice: number; discount?: number }>; clientAddress?: string; clientPhone?: string; }) | null}
+        onPreview={handlePreview}
+        onDownload={handleDownload}
+      />
     </PageContainer>
   );
 };

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Report 01-connexion</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0b0c; color:#f4f4f5; margin:0; }
+    header { padding: 20px; border-bottom: 1px solid #27272a; background: #111113; position: sticky; top: 0; }
+    .meta { display:flex; flex-wrap:wrap; gap:12px; font-size: 13px; color:#a1a1aa; }
+    .pill { border:1px solid #27272a; padding:6px 10px; border-radius:999px; }
+    main { padding: 20px; max-width: 1100px; margin: 0 auto; }
+    .step { padding: 14px; border: 1px solid #27272a; border-radius: 12px; background:#0f0f10; margin-bottom: 14px; }
+    .step-head { display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+    .step-title { font-weight: 700; }
+    .step-time { color:#a1a1aa; font-size: 12px; }
+    .shots { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+    .shot { display:block; text-decoration:none; color:inherit; border:1px solid #27272a; border-radius: 12px; overflow:hidden; background:#09090b; }
+    .shot img { width:100%; height: 160px; object-fit: cover; display:block; }
+    .caption { padding: 10px; font-size: 12px; color:#d4d4d8; border-top:1px solid #27272a; }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    .details { margin-top: 10px; font-size: 12px; color:#d4d4d8; background:#09090b; border:1px solid #27272a; border-radius: 10px; padding: 10px; }
+    .error { border:1px solid #7f1d1d; background:#130b0b; padding: 14px; border-radius: 12px; }
+    .status-pass { color:#22c55e; font-weight:700; }
+    .status-fail { color:#ef4444; font-weight:700; }
+    .status-running { color:#eab308; font-weight:700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0 0 10px 0">Report: 01-connexion</h1>
+    <div class="meta">
+      <div class="pill">Status: <span class="status-pass">PASS</span></div>
+      <div class="pill">Start: 2026-02-07T21:13:23.979Z</div>
+      <div class="pill">End: 2026-02-07T21:13:36.721Z</div>
+      <div class="pill">Duration: 12742ms</div>
+    </div>
+  </header>
+  <main>
+    
+    
+        <section class="step">
+          <div class="step-head">
+            <div class="step-title">1. Page login chargée</div>
+            <div class="step-time">2026-02-07T21:13:34.954Z</div>
+          </div>
+          <pre class="details">{
+  &quot;url&quot;: &quot;https://developper.impots.bj/sygmef-test&quot;
+}</pre>
+          <div class="shots">
+          <a class="shot" href="../screenshots/01-connexion/2026-02-07_22-13-34_01_page-login.png" target="_blank" rel="noreferrer">
+            <img src="../screenshots/01-connexion/2026-02-07_22-13-34_01_page-login.png" alt="page-login" />
+            <div class="caption">2026-02-07_22-13-34_01_page-login.png</div>
+          </a>
+        </div>
+        </section>
+      
+
+        <section class="step">
+          <div class="step-head">
+            <div class="step-title">2. Credentials saisis</div>
+            <div class="step-time">2026-02-07T21:13:35.586Z</div>
+          </div>
+          <pre class="details">{
+  &quot;ifuLength&quot;: 7,
+  &quot;passwordLength&quot;: 16
+}</pre>
+          <div class="shots">
+          <a class="shot" href="../screenshots/01-connexion/2026-02-07_22-13-35_02_credentials-saisis.png" target="_blank" rel="noreferrer">
+            <img src="../screenshots/01-connexion/2026-02-07_22-13-35_02_credentials-saisis.png" alt="credentials-saisis" />
+            <div class="caption">2026-02-07_22-13-35_02_credentials-saisis.png</div>
+          </a>
+        </div>
+        </section>
+      
+
+        <section class="step">
+          <div class="step-head">
+            <div class="step-title">3. Après clic sur Se connecter</div>
+            <div class="step-time">2026-02-07T21:13:36.471Z</div>
+          </div>
+          
+          <div class="shots">
+          <a class="shot" href="../screenshots/01-connexion/2026-02-07_22-13-36_03_apres-submit.png" target="_blank" rel="noreferrer">
+            <img src="../screenshots/01-connexion/2026-02-07_22-13-36_03_apres-submit.png" alt="apres-submit" />
+            <div class="caption">2026-02-07_22-13-36_03_apres-submit.png</div>
+          </a>
+        </div>
+        </section>
+      
+
+        <section class="step">
+          <div class="step-head">
+            <div class="step-title">4. Écran post-connexion (dashboard attendu)</div>
+            <div class="step-time">2026-02-07T21:13:36.721Z</div>
+          </div>
+          <pre class="details">{
+  &quot;dashboardOk&quot;: true,
+  &quot;currentUrl&quot;: &quot;https://developper.impots.bj/sygmef-test/Account/Login?ReturnUrl=%2Fsygmef-test&quot;
+}</pre>
+          <div class="shots">
+          <a class="shot" href="../screenshots/01-connexion/2026-02-07_22-13-36_04_dashboard.png" target="_blank" rel="noreferrer">
+            <img src="../screenshots/01-connexion/2026-02-07_22-13-36_04_dashboard.png" alt="dashboard" />
+            <div class="caption">2026-02-07_22-13-36_04_dashboard.png</div>
+          </a>
+        </div>
+        </section>
+      
+  </main>
+</body>
+</html>

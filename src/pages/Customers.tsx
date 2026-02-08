@@ -24,7 +24,15 @@ const Customers = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' as 'percentage' | 'fixed' });
+  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', ifu: '', aibRegistration: false, aibRate: '0', discount: '', discountType: 'percentage' as 'percentage' | 'fixed' });
+
+  const normalizeIfu = (v: string) => v.replace(/\s+/g, '').trim();
+
+  const parseAibRate = (v: string): 0 | 1 | 5 => {
+    if (v === '1') return 1;
+    if (v === '5') return 5;
+    return 0;
+  };
 
   const load = async () => {
     const c = await db.getClients();
@@ -102,7 +110,16 @@ const Customers = () => {
                         <Button size="sm" variant="ghost" onClick={() => {
                           // open edit modal
                           const [last, first] = (c.name || '').split(/\s+/, 2).concat(['']).slice(0,2);
-                          setForm({ firstName: first || '', lastName: last || '', phone: c.phone || '', discount: c.discount ? String(c.discount) : '', discountType: c.discountType || 'percentage' });
+                          setForm({
+                            firstName: first || '',
+                            lastName: last || '',
+                            phone: c.phone || '',
+                            ifu: c.ifu || '',
+                            aibRegistration: Boolean(c.aibRegistration),
+                            aibRate: String(c.aibRate ?? 0),
+                            discount: c.discount ? String(c.discount) : '',
+                            discountType: c.discountType || 'percentage',
+                          });
                           setEditingId(c.id);
                           setIsEditing(true);
                         }}>Modifier</Button>
@@ -138,6 +155,36 @@ const Customers = () => {
               <Label>Téléphone</Label>
               <Input placeholder="+229 97 00 00 00" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
+            <div className="mb-4">
+              <Label>IFU</Label>
+              <Input value={form.ifu} onChange={(e) => setForm({ ...form, ifu: e.target.value })} placeholder="0202..." />
+            </div>
+            <div className="mb-4 grid grid-cols-2 gap-2">
+              <div>
+                <Label>Assujetti AIB</Label>
+                <div className="flex items-center gap-2 h-10">
+                  <input
+                    type="checkbox"
+                    checked={form.aibRegistration}
+                    onChange={(e) => setForm({ ...form, aibRegistration: e.target.checked, aibRate: e.target.checked ? form.aibRate : '0' })}
+                  />
+                  <span className="text-sm text-muted-foreground">Client enregistré</span>
+                </div>
+              </div>
+              <div>
+                <Label>Taux AIB</Label>
+                <select
+                  className="input"
+                  value={form.aibRegistration ? form.aibRate : '0'}
+                  onChange={(e) => setForm({ ...form, aibRate: e.target.value })}
+                  disabled={!form.aibRegistration}
+                >
+                  <option value="0">0%</option>
+                  <option value="1">1%</option>
+                  <option value="5">5%</option>
+                </select>
+              </div>
+            </div>
             <div className="mb-4 grid grid-cols-2 gap-2">
               <div>
                 <Label>Type de remise</Label>
@@ -152,12 +199,27 @@ const Customers = () => {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setIsAdding(false); setIsEditing(false); setEditingId(null); setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' }); }}>Annuler</Button>
+              <Button variant="outline" onClick={() => { setIsAdding(false); setIsEditing(false); setEditingId(null); setForm({ firstName: '', lastName: '', phone: '', ifu: '', aibRegistration: false, aibRate: '0', discount: '', discountType: 'percentage' }); }}>Annuler</Button>
               <Button onClick={async () => {
                 const fullName = `${(form.lastName||'').trim()} ${(form.firstName||'').trim()}`.trim() || 'Client';
+                const ifu = normalizeIfu(form.ifu);
+                if (ifu && !/^\d{13}$/.test(ifu)) {
+                  toast({ title: 'Erreur', description: "IFU invalide (13 chiffres attendus)", variant: 'destructive' });
+                  return;
+                }
+                const aibRegistration = Boolean(form.aibRegistration);
+                const aibRate = aibRegistration ? parseAibRate(String(form.aibRate)) : (0 as 0);
                 if (isEditing && editingId) {
                   try {
-                    const updated = await db.updateClient(editingId, { name: fullName, phone: form.phone || undefined, discount: form.discount ? parseFloat(form.discount) : undefined, discountType: form.discount ? form.discountType : undefined });
+                    const updated = await db.updateClient(editingId, {
+                      name: fullName,
+                      phone: form.phone || undefined,
+                      ifu: ifu || undefined,
+                      aibRegistration,
+                      aibRate,
+                      discount: form.discount ? parseFloat(form.discount) : undefined,
+                      discountType: form.discount ? form.discountType : undefined,
+                    });
                     // Immediately update local state so UI reflects changes even if underlying storage is slow
                     if (updated) {
                       setClients(prev => (prev || []).map(c => c.id === editingId ? (updated as Client) : c));
@@ -169,7 +231,7 @@ const Customers = () => {
                     toast({ title: 'Modifié', description: 'Client modifié' });
                     setIsEditing(false);
                     setEditingId(null);
-                    setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' });
+                    setForm({ firstName: '', lastName: '', phone: '', ifu: '', aibRegistration: false, aibRate: '0', discount: '', discountType: 'percentage' });
                     // Reload to ensure persistence sources are in sync
                     load();
                   } catch (err) {
@@ -182,6 +244,9 @@ const Customers = () => {
                     name: fullName,
                     contactInfo: '',
                     phone: form.phone || undefined,
+                    ifu: ifu || undefined,
+                    aibRegistration,
+                    aibRate,
                     discount: form.discount ? parseFloat(form.discount) : undefined,
                     discountType: form.discount ? form.discountType : undefined,
                   } as Client;
@@ -189,7 +254,7 @@ const Customers = () => {
                     await db.addClient(client);
                     toast({ title: 'Succès', description: 'Client ajouté' });
                     setIsAdding(false);
-                    setForm({ firstName: '', lastName: '', phone: '', discount: '', discountType: 'percentage' });
+                    setForm({ firstName: '', lastName: '', phone: '', ifu: '', aibRegistration: false, aibRate: '0', discount: '', discountType: 'percentage' });
                     load();
                   } catch (err) {
                     logger.error('Failed to add client', err);

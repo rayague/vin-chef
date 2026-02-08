@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { formatMecEfCode } from '@/lib/security-utils';
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -13,6 +14,7 @@ export interface InvoiceData {
   logoDataUrl?: string;
   emcfCodeMECeFDGI?: string;
   emcfQrCode?: string;
+  emcfQrCodeDataUrl?: string;
   emcfDateTime?: string;
   emcfCounters?: string;
   emcfNim?: string;
@@ -142,6 +144,8 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     doc.text('Paiement: 30 jours', 135, 41);
   }
 
+  // (QR code e-MECeF affiché sous le tableau, à côté des totaux)
+
   // e-MCF info (when available)
   if (data.emcfCodeMECeFDGI || data.emcfQrCode || data.emcfNim || data.emcfCounters || data.emcfDateTime) {
     const boxTop = invoiceBoxY;
@@ -187,15 +191,6 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       const lines = doc.splitTextToSize(`Compteurs: ${data.emcfCounters}`, emcfMaxWidth) as string[];
       const r = writeLines(lines, emcfY);
       emcfY = r.y;
-    }
-    if (data.emcfQrCode) {
-      const qr = String(data.emcfQrCode);
-      const short = qr.length > 72 ? `${qr.slice(0, 72)}…` : qr;
-      const lines = doc.splitTextToSize(`QR: ${short}`, emcfMaxWidth) as string[];
-      const r = writeLines(lines, emcfY);
-      if (r.truncated) {
-        doc.text('…', emcfX, boxBottom - 2);
-      }
     }
   }
 
@@ -346,6 +341,34 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.text('Total TTC', totalsLabelX, y);
   doc.text(`${formatCurrency(data.totalTTC)} FCFA`, totalsValueX, y, { align: 'right' });
 
+  // e-MECeF QR + code MECeF (sous le tableau, sur la même ligne que les totaux)
+  if (data.emcfQrCodeDataUrl) {
+    try {
+      const qrSize = 38;
+      const qrPad = 4;
+      const qrX = 15 + qrPad;
+      const qrY = totalsBoxTop + qrPad;
+
+      doc.setDrawColor(210, 210, 210);
+      doc.setLineWidth(0.2);
+      doc.rect(qrX - 1.5, qrY - 1.5, qrSize + 3, qrSize + 3);
+      doc.addImage(data.emcfQrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+
+      const formatted = formatMecEfCode(data.emcfCodeMECeFDGI);
+      if (formatted) {
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        const codeLines = doc.splitTextToSize(formatted, qrSize + 8) as string[];
+        doc.text(codeLines, qrX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   // Payment information box
   const paymentY = totalsBoxTop + totalsBoxH + 10;
   doc.setDrawColor(accent[0], accent[1], accent[2]);
@@ -422,6 +445,22 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.setTextColor(150, 150, 150);
   const footerBottomY = Math.min(pageHeight - 5, footerY + 22);
   doc.text(`Document généré électroniquement le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })} | ${COMPANY_INFO.name}`, 105, footerBottomY, { align: 'center' });
+
+  // Footer sécurité e-MECeF (si disponible)
+  if (data.emcfCodeMECeFDGI || data.emcfNim || data.emcfDateTime) {
+    const secY = footerY + 18;
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    const parts: string[] = [];
+    const code = formatMecEfCode(data.emcfCodeMECeFDGI);
+    if (code) parts.push(`Code MECeF: ${code}`);
+    if (data.emcfNim) parts.push(`NIM: ${String(data.emcfNim)}`);
+    if (data.emcfDateTime) parts.push(`Date DGI: ${String(data.emcfDateTime)}`);
+    const line = parts.join('  •  ');
+    if (line) doc.text(line, 15, Math.min(secY, footerBottomY - 2));
+    doc.setFont('helvetica', 'normal');
+  }
 
   return doc;
 };

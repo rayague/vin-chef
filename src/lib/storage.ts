@@ -14,6 +14,8 @@ export interface Product {
   unitPrice: number;
   stockQuantity: number;
   description: string;
+  taxGroup?: 'A' | 'B' | 'C' | 'D' | 'E' | 'EXPORT';
+  tvaRate?: number;
 }
 
 export interface Client {
@@ -26,6 +28,8 @@ export interface Client {
   ifu?: string;
   discount?: number; // Montant ou pourcentage selon discountType
   discountType?: 'percentage' | 'fixed';
+  aibRegistration?: boolean;
+  aibRate?: 0 | 1 | 5;
 }
 
 export interface Sale {
@@ -66,6 +70,11 @@ export interface Invoice {
   createdBy?: string;
   discount?: number; // Montant de la remise appliquée
   discountType?: 'percentage' | 'fixed'; // Type de remise
+
+  invoiceType?: 'FV' | 'AV' | 'FV_EXPORT' | 'AV_EXPORT';
+  originalInvoiceReference?: string;
+  aibRate?: 0 | 1 | 5;
+  paymentMethods?: Array<{ type: string; amount: number }>;
 
   emcfUid?: string;
   emcfStatus?: string;

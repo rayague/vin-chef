@@ -1,0 +1,15 @@
+{
+  "name": "tests-emcf-visuels",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Tests Playwright visuels (captures d'écran) pour SyGMEF / e-MECeF",
+  "scripts": {
+    "test:01": "node tests-individuels/01-connexion-sygmef.js",
+    "test:all": "node run-all-tests.js",
+    "open-reports": "node utils/open-reports.js"
+  },
+  "dependencies": {
+    "playwright": "^1.42.1"
+  }
+}

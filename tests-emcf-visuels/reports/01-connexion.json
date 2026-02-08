@@ -1,0 +1,78 @@
+{
+  "testId": "01-connexion",
+  "startedAt": "2026-02-07T21:13:23.979Z",
+  "finishedAt": "2026-02-07T21:13:36.721Z",
+  "durationMs": 12742,
+  "status": "PASS",
+  "meta": {
+    "targetUrl": "https://developper.impots.bj/sygmef-test",
+    "headless": false,
+    "slowMoMs": 60
+  },
+  "steps": [
+    {
+      "at": "2026-02-07T21:13:34.954Z",
+      "title": "Page login chargée",
+      "action": "page-login",
+      "details": {
+        "url": "https://developper.impots.bj/sygmef-test"
+      },
+      "screenshots": [
+        {
+          "fileName": "2026-02-07_22-13-34_01_page-login.png",
+          "filePath": "D:\\Projects\\vin-chef\\tests-emcf-visuels\\screenshots\\01-connexion\\2026-02-07_22-13-34_01_page-login.png",
+          "relPath": "01-connexion/2026-02-07_22-13-34_01_page-login.png",
+          "label": "page-login"
+        }
+      ]
+    },
+    {
+      "at": "2026-02-07T21:13:35.586Z",
+      "title": "Credentials saisis",
+      "action": "credentials-saisis",
+      "details": {
+        "ifuLength": 7,
+        "passwordLength": 16
+      },
+      "screenshots": [
+        {
+          "fileName": "2026-02-07_22-13-35_02_credentials-saisis.png",
+          "filePath": "D:\\Projects\\vin-chef\\tests-emcf-visuels\\screenshots\\01-connexion\\2026-02-07_22-13-35_02_credentials-saisis.png",
+          "relPath": "01-connexion/2026-02-07_22-13-35_02_credentials-saisis.png",
+          "label": "credentials-saisis"
+        }
+      ]
+    },
+    {
+      "at": "2026-02-07T21:13:36.471Z",
+      "title": "Après clic sur Se connecter",
+      "action": "apres-submit",
+      "screenshots": [
+        {
+          "fileName": "2026-02-07_22-13-36_03_apres-submit.png",
+          "filePath": "D:\\Projects\\vin-chef\\tests-emcf-visuels\\screenshots\\01-connexion\\2026-02-07_22-13-36_03_apres-submit.png",
+          "relPath": "01-connexion/2026-02-07_22-13-36_03_apres-submit.png",
+          "label": "apres-submit"
+        }
+      ]
+    },
+    {
+      "at": "2026-02-07T21:13:36.721Z",
+      "title": "Écran post-connexion (dashboard attendu)",
+      "action": "dashboard",
+      "details": {
+        "dashboardOk": true,
+        "currentUrl": "https://developper.impots.bj/sygmef-test/Account/Login?ReturnUrl=%2Fsygmef-test"
+      },
+      "screenshots": [
+        {
+          "fileName": "2026-02-07_22-13-36_04_dashboard.png",
+          "filePath": "D:\\Projects\\vin-chef\\tests-emcf-visuels\\screenshots\\01-connexion\\2026-02-07_22-13-36_04_dashboard.png",
+          "relPath": "01-connexion/2026-02-07_22-13-36_04_dashboard.png",
+          "label": "dashboard"
+        }
+      ]
+    }
+  ],
+  "error": null
+}

@@ -28,6 +28,7 @@ const Sales = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [users, setUsers] = useState<{ id: string; username: string }[]>([]);
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [clientForm, setClientForm] = useState({ firstName: '', lastName: '', phone: '' });
@@ -54,6 +55,9 @@ const Sales = () => {
 
   const [formData, setFormData] = useState({
     clientId: '',
+    invoiceType: 'FV' as NonNullable<Invoice['invoiceType']>,
+    originalInvoiceReference: '',
+    aibRateOverride: '' as '' | '0' | '1' | '5',
   });
 
   const [items, setItems] = useState<Array<{ productId: string; quantity: string; discount: string; discountType: 'percentage' | 'fixed' }>>([
@@ -63,14 +67,31 @@ const Sales = () => {
   const location = useLocation();
 
   const loadData = useCallback(async () => {
-    const [s, p, c, u] = await Promise.all([db.getSales(), db.getProducts(), db.getClients(), db.getUsers()]);
+    const [s, p, c, u, inv] = await Promise.all([db.getSales(), db.getProducts(), db.getClients(), db.getUsers(), db.getInvoices()]);
     const allSales = s as Sale[];
     const visibleSales = (user && user.role !== 'admin') ? allSales.filter(sale => (sale as unknown as Sale).createdBy === user.id) : allSales;
     setSales(visibleSales);
     setProducts(p as Product[]);
     setClients(c as Client[]);
     setUsers((u as unknown as { id: string; username: string }[]) || []);
+    setInvoices((inv as Invoice[]) || []);
   }, [user]);
+
+  const taxGroupToTvaRate = (g: NonNullable<Product['taxGroup']>): number => {
+    if (g === 'B') return 18;
+    if (g === 'C') return 10;
+    if (g === 'D') return 5;
+    if (g === 'A') return 0;
+    if (g === 'E') return 0;
+    if (g === 'EXPORT') return 0;
+    return 18;
+  };
+
+  const parseAibRate = (v: string): 0 | 1 | 5 => {
+    if (v === '1') return 1;
+    if (v === '5') return 5;
+    return 0;
+  };
 
   useEffect(() => {
     if (!user) {
@@ -170,9 +191,33 @@ const Sales = () => {
       }
     }
 
-    // compute totals
+    const invoiceType = formData.invoiceType;
+    const isAvoir = invoiceType === 'AV' || invoiceType === 'AV_EXPORT';
+    const isExport = invoiceType === 'FV_EXPORT' || invoiceType === 'AV_EXPORT';
+
+    if (isAvoir) {
+      const ref = String(formData.originalInvoiceReference || '').trim();
+      if (!ref) {
+        toast({ title: 'Erreur', description: 'Référence facture originale requise pour un avoir', variant: 'destructive' });
+        return;
+      }
+
+      const exists = invoices.some((inv) => {
+        const anyInv = inv as unknown as Invoice & { emcfUid?: string; emcfCodeMECeFDGI?: string };
+        const code = String(anyInv.emcfCodeMECeFDGI || '').replace(/-/g, '').trim();
+        const uid = String(anyInv.emcfUid || '').trim();
+        return ref === uid || ref === code || ref === anyInv.emcfCodeMECeFDGI;
+      });
+      if (!exists) {
+        toast({ title: 'Erreur', description: "Référence inconnue (la facture originale doit exister et être normalisée)", variant: 'destructive' });
+        return;
+      }
+    }
+
+    // compute totals (renderer, for UX only; main process will remain source of truth later)
     let totalHT = 0;
     let totalDiscount = 0;
+    let totalVat = 0;
     const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }> = [];
     const normalizedItems: Array<{ productId: string; quantity: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
     for (const it of validItems) {
@@ -198,6 +243,12 @@ const Sales = () => {
       const lineTotalHT = unit * q - discountAmount;
       totalHT += lineTotalHT;
       totalDiscount += discountAmount;
+
+      const g = ((prod as unknown as Product).taxGroup || (isExport ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
+      const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
+      const lineVat = Math.round(lineTotalHT * (rate / 100));
+      totalVat += lineVat;
+
       itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, discount: discountAmount > 0 ? discountAmount : undefined });
       normalizedItems.push({ productId: it.productId, quantity: q, discount: d > 0 ? d : undefined, discountType: it.discountType });
     }
@@ -207,8 +258,14 @@ const Sales = () => {
       return;
     }
 
-    const tva = totalHT * 0.18;
-    const totalTTC = totalHT + tva;
+    const selectedClient = clients.find(c => c.id === formData.clientId) as (Client | undefined);
+    const clientAibRate = selectedClient && selectedClient.aibRegistration ? (selectedClient.aibRate ?? 0) : 0;
+    const override = formData.aibRateOverride ? parseAibRate(formData.aibRateOverride) : null;
+    const aibRate = (override !== null ? override : clientAibRate) as 0 | 1 | 5;
+    const aibAmount = Math.round(totalHT * (aibRate / 100));
+
+    const tva = totalVat;
+    const totalTTC = totalHT + tva + aibAmount;
 
     if (!Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
       toast({ title: 'Erreur', description: 'Montants invalides (TVA/Total)', variant: 'destructive' });
@@ -247,23 +304,52 @@ const Sales = () => {
           }
 
           const price = Math.max(0, Math.round(netUnit));
+
+          const taxGroup = ((prod.taxGroup || (isExport ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>);
           return {
             code: prod.id,
             name: prod.name,
             price,
             quantity: it.quantity,
-            taxGroup: 'B',
+            taxGroup,
           };
         });
 
         const totalHTInt = emcfItems.reduce((s, it) => s + it.price * it.quantity, 0);
-        const tvaInt = Math.round(totalHTInt * 0.18);
-        const totalTTCInt = totalHTInt + tvaInt;
+        const tvaInt = emcfItems.reduce((s, it) => {
+          const g = String((it as unknown as { taxGroup?: string }).taxGroup || 'B').toUpperCase() as NonNullable<Product['taxGroup']>;
+          const rate = taxGroupToTvaRate(g);
+          return s + Math.round((it.price * it.quantity) * (rate / 100));
+        }, 0);
+        const aibInt = Math.round(totalHTInt * (aibRate / 100));
+        const totalTTCInt = totalHTInt + tvaInt + aibInt;
+
+        const paymentMethods: Array<{ type: string; amount: number }> = [{ type: 'ESPECES', amount: totalTTCInt }];
+
+        const ref = String(formData.originalInvoiceReference || '').trim();
+        const original = isAvoir
+          ? invoices.find((inv) => {
+              const anyInv = inv as unknown as Invoice & { emcfUid?: string; emcfCodeMECeFDGI?: string };
+              const code = String(anyInv.emcfCodeMECeFDGI || '').replace(/-/g, '').trim();
+              const uid = String(anyInv.emcfUid || '').trim();
+              return ref === uid || ref === code || ref === anyInv.emcfCodeMECeFDGI;
+            })
+          : undefined;
+        const originalUid = (original as unknown as Invoice & { emcfUid?: string })?.emcfUid;
+        const originalCode = (original as unknown as Invoice & { emcfCodeMECeFDGI?: string })?.emcfCodeMECeFDGI;
+        const code24 = originalCode ? String(originalCode).replace(/-/g, '').trim() : '';
 
         const payload = {
           ifu: vendorIfu,
-          type: 'FV',
+          type: invoiceType === 'FV_EXPORT' ? 'FV' : invoiceType === 'AV_EXPORT' ? 'AV' : invoiceType,
           items: emcfItems,
+          customer: {
+            name: client.name,
+            ifu: (client as unknown as { ifu?: string }).ifu || null,
+            address: client.address || '—',
+            phone: (client.phone || client.contactInfo || '') as string,
+            email: null,
+          },
           client: {
             ifu: (client as unknown as { ifu?: string }).ifu || undefined,
             name: client.name,
@@ -277,9 +363,20 @@ const Sales = () => {
           payment: [
             {
               name: 'ESPECES',
+              mode: 'CASH',
               amount: totalTTCInt,
             },
           ],
+          paymentMethods,
+          aibRate,
+          aibAmount,
+          ...(isAvoir
+            ? {
+                originalInvoiceReference: code24 || originalUid || ref,
+                reference: originalUid || ref,
+                originalInvoiceUid: originalUid || ref,
+              }
+            : {}),
         };
 
         const invRes = await emcf.submitInvoice(payload);
@@ -357,6 +454,10 @@ const Sales = () => {
           tva,
           ifu: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
           tvaRate: 18,
+          invoiceType,
+          originalInvoiceReference: isAvoir ? (formData.originalInvoiceReference || undefined) : undefined,
+          aibRate,
+          paymentMethods: [{ type: 'ESPECES', amount: Math.round(totalTTC) }],
           immutableFlag: 1,
           createdBy: user?.id,
           discount: totalDiscount > 0 ? totalDiscount : undefined,
@@ -377,6 +478,10 @@ const Sales = () => {
           totalPrice: totalTTC,
           tva,
           tvaRate: 18,
+          invoiceType,
+          originalInvoiceReference: isAvoir ? (formData.originalInvoiceReference || undefined) : undefined,
+          aibRate,
+          paymentMethods: [{ type: 'ESPECES', amount: Math.round(totalTTC) }],
           createdBy: user?.id,
           discount: totalDiscount > 0 ? totalDiscount : undefined,
           discountType: totalDiscount > 0 ? 'fixed' : undefined,
@@ -462,6 +567,15 @@ const Sales = () => {
         tva: emcfPending.totals.tva,
         ifu: ((emcfPending.client as unknown) as Client & { ifu?: string }).ifu || undefined,
         tvaRate: 18,
+        invoiceType: formData.invoiceType,
+        originalInvoiceReference: (formData.invoiceType === 'AV' || formData.invoiceType === 'AV_EXPORT') ? (formData.originalInvoiceReference || undefined) : undefined,
+        aibRate: (() => {
+          const c = clients.find(x => x.id === formData.clientId);
+          const clientAibRate = c && c.aibRegistration ? (c.aibRate ?? 0) : 0;
+          const override = formData.aibRateOverride ? parseAibRate(formData.aibRateOverride) : null;
+          return (override !== null ? override : clientAibRate) as 0 | 1 | 5;
+        })(),
+        paymentMethods: [{ type: 'ESPECES', amount: emcfPending.totals.totalTTC }],
         immutableFlag: 1,
         createdBy: user?.id,
         discount: emcfPending.totals.totalDiscount > 0 ? emcfPending.totals.totalDiscount : undefined,
@@ -493,7 +607,7 @@ const Sales = () => {
   };
 
   const resetForm = () => {
-    setFormData({ clientId: '' });
+    setFormData({ clientId: '', invoiceType: 'FV', originalInvoiceReference: '', aibRateOverride: '' });
     setItems([{ productId: '', quantity: '1', discount: '', discountType: 'percentage' }]);
   };
 
@@ -568,6 +682,62 @@ const Sales = () => {
                     </div>
                   ) : (
                     <form onSubmit={handleSubmit} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Type de facture *</Label>
+                        <Select value={formData.invoiceType} onValueChange={(v) => setFormData((prev) => ({ ...prev, invoiceType: v as NonNullable<Invoice['invoiceType']> }))}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="FV">Facture de vente (FV)</SelectItem>
+                            <SelectItem value="AV">Facture d'avoir (AV)</SelectItem>
+                            <SelectItem value="FV_EXPORT">Vente export (TVA 0%)</SelectItem>
+                            <SelectItem value="AV_EXPORT">Avoir export (TVA 0%)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {(formData.invoiceType === 'AV' || formData.invoiceType === 'AV_EXPORT') && (
+                        <div className="space-y-2">
+                          <Label>Référence facture originale *</Label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <Input
+                              value={formData.originalInvoiceReference}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, originalInvoiceReference: e.target.value }))}
+                              placeholder="UID ou code MECeF (24)"
+                            />
+                            <Select
+                              value={formData.originalInvoiceReference || '__none'}
+                              onValueChange={(v) => setFormData((prev) => ({ ...prev, originalInvoiceReference: v === '__none' ? '' : v }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choisir une facture" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none">—</SelectItem>
+                                {invoices
+                                  .filter((inv) => {
+                                    const anyInv = inv as unknown as Invoice & { emcfCodeMECeFDGI?: string; emcfUid?: string };
+                                    return Boolean(anyInv.emcfCodeMECeFDGI || anyInv.emcfUid);
+                                  })
+                                  .slice(0, 50)
+                                  .map((inv) => {
+                                    const anyInv = inv as unknown as Invoice & { emcfCodeMECeFDGI?: string; emcfUid?: string };
+                                    const label = `${inv.invoiceNumber} — ${anyInv.emcfCodeMECeFDGI || anyInv.emcfUid || ''}`;
+                                    const value = String(anyInv.emcfCodeMECeFDGI || anyInv.emcfUid || '');
+                                    return (
+                                      <SelectItem key={inv.id} value={value}>
+                                        {label}
+                                      </SelectItem>
+                                    );
+                                  })}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <p className="text-xs text-muted-foreground">On enverra plusieurs variantes de champ (Option C) pour maximiser la compatibilité API.</p>
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <div className="flex-1">
@@ -663,11 +833,38 @@ const Sales = () => {
                         <div className="flex items-center gap-2">
                           <Label className="text-sm font-semibold">Récapitulatif</Label>
                         </div>
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">AIB</div>
+                            <div className="text-xs text-muted-foreground">
+                              {(() => {
+                                const c = clients.find(x => x.id === formData.clientId);
+                                if (!c) return '—';
+                                if (!c.aibRegistration) return 'Non assujetti (0%)';
+                                return `Assujetti (${c.aibRate ?? 0}%)`;
+                              })()}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs">Override</Label>
+                            <select
+                              className="rounded border px-2 py-1 text-sm"
+                              value={formData.aibRateOverride}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, aibRateOverride: e.target.value as '' | '0' | '1' | '5' }))}
+                            >
+                              <option value="">Auto</option>
+                              <option value="0">0%</option>
+                              <option value="1">1%</option>
+                              <option value="5">5%</option>
+                            </select>
+                          </div>
+                        </div>
                         {(() => {
                           const validItems = items.filter(it => it.productId && Number.parseInt(String(it.quantity), 10) > 0);
                           if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
                           let totalHT = 0;
                           let totalDiscount = 0;
+                          let totalVat = 0;
                           for (const it of validItems) {
                             const prod = products.find(p => p.id === it.productId);
                             if (!prod) continue;
@@ -684,10 +881,19 @@ const Sales = () => {
                             }
                             totalHT += unit * q - discountAmount;
                             totalDiscount += discountAmount;
+
+                            const g = ((prod as unknown as Product).taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
+                            const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
+                            totalVat += Math.round((unit * q - discountAmount) * (rate / 100));
                           }
 
-                          const tva = totalHT * 0.18;
-                          const totalTTC = totalHT + tva;
+                          const c = clients.find(x => x.id === formData.clientId);
+                          const clientAibRate = c && c.aibRegistration ? (c.aibRate ?? 0) : 0;
+                          const override = formData.aibRateOverride ? parseAibRate(formData.aibRateOverride) : null;
+                          const aibRate = (override !== null ? override : clientAibRate) as 0 | 1 | 5;
+                          const aibAmount = Math.round(totalHT * (aibRate / 100));
+                          const tva = totalVat;
+                          const totalTTC = totalHT + tva + aibAmount;
 
                           if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount) || !Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
                             return <p className="text-sm text-muted-foreground">Montants invalides (vérifie prix, quantité et remise)</p>;
@@ -703,8 +909,12 @@ const Sales = () => {
                                 <span className="font-medium">- {totalDiscount.toLocaleString('fr-FR')} FCFA</span>
                               </div>
                               <div className="flex justify-between">
-                                <span>TVA (18%):</span>
+                                <span>TVA:</span>
                                 <span className="font-medium">{tva.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>AIB ({aibRate}%):</span>
+                                <span className="font-medium">{aibAmount.toLocaleString('fr-FR')} FCFA</span>
                               </div>
                               <div className="flex justify-between font-bold text-base pt-1 border-t">
                                 <span>Total TTC:</span>

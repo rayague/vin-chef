@@ -87,12 +87,17 @@ export const db = {
       return list.map((p) => {
         const unitPriceRaw = (p as { unitPrice?: unknown; unit_price?: unknown }).unitPrice ?? (p as { unit_price?: unknown }).unit_price;
         const stockQtyRaw = (p as { stockQuantity?: unknown; stock_quantity?: unknown }).stockQuantity ?? (p as { stock_quantity?: unknown }).stock_quantity;
+        const taxGroupRaw = (p as { taxGroup?: unknown; tax_group?: unknown }).taxGroup ?? (p as { tax_group?: unknown }).tax_group;
+        const tvaRateRaw = (p as { tvaRate?: unknown; tva_rate?: unknown }).tvaRate ?? (p as { tva_rate?: unknown }).tva_rate;
         const unitPrice = Number(unitPriceRaw);
         const stockQuantity = Number.parseInt(String(stockQtyRaw ?? ''), 10);
+        const tvaRate = Number(tvaRateRaw);
         return {
           ...(p as unknown as StorageProduct),
           unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
           stockQuantity: Number.isFinite(stockQuantity) ? stockQuantity : 0,
+          taxGroup: (typeof taxGroupRaw === 'string' ? taxGroupRaw : undefined) as StorageProduct['taxGroup'],
+          tvaRate: Number.isFinite(tvaRate) ? tvaRate : undefined,
         } as StorageProduct;
       });
     }
@@ -162,7 +167,28 @@ export const db = {
   async getClients() {
     if (isElectronDBAvailable()) {
       const res = await (window as unknown as Window).electronAPI!.db!.getClients();
-      return res as StorageClient[];
+      const list = (res as unknown as Array<Record<string, unknown>>) || [];
+      return list.map((c) => {
+        const anyC = c as {
+          contactInfo?: unknown;
+          contact_info?: unknown;
+          aibRegistration?: unknown;
+          aib_registration?: unknown;
+          aibRate?: unknown;
+          aib_rate?: unknown;
+          ifu?: unknown;
+        };
+        const aibRegistrationRaw = anyC.aibRegistration ?? anyC.aib_registration;
+        const aibRateRaw = anyC.aibRate ?? anyC.aib_rate;
+        const aibRateNum = Number(aibRateRaw);
+        return {
+          ...(c as unknown as StorageClient),
+          contactInfo: String((anyC.contactInfo ?? anyC.contact_info ?? '') as string),
+          ifu: typeof anyC.ifu === 'string' ? anyC.ifu : undefined,
+          aibRegistration: Boolean(aibRegistrationRaw),
+          aibRate: (aibRateNum === 0 || aibRateNum === 1 || aibRateNum === 5 ? aibRateNum : 0) as StorageClient['aibRate'],
+        } as StorageClient;
+      });
     }
     try {
       const items = await idb.idbGetAll<StorageClient>('clients');

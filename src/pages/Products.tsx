@@ -33,8 +33,19 @@ const Products = () => {
     unitPrice: '',
     stockQuantity: '',
     description: '',
+    taxGroup: 'B' as NonNullable<Product['taxGroup']>,
   });
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+
+  const taxGroupToTvaRate = (g: NonNullable<Product['taxGroup']>): number => {
+    if (g === 'B') return 18;
+    if (g === 'C') return 10;
+    if (g === 'D') return 5;
+    if (g === 'A') return 0;
+    if (g === 'E') return 0;
+    if (g === 'EXPORT') return 0;
+    return 18;
+  };
 
   useEffect(() => {
     if (!user) {
@@ -77,9 +88,16 @@ const Products = () => {
           unitPrice?: unknown;
           stockQuantity?: unknown;
           description?: unknown;
+          taxGroup?: unknown;
+          tax_group?: unknown;
+          tvaRate?: unknown;
+          tva_rate?: unknown;
         };
         const unitPrice = Number(anyP.unitPrice);
         const stockQuantity = Number.parseInt(String(anyP.stockQuantity ?? ''), 10);
+        const taxGroupRaw = anyP.taxGroup ?? anyP.tax_group;
+        const tvaRateRaw = anyP.tvaRate ?? anyP.tva_rate;
+        const tvaRate = Number(tvaRateRaw);
         return {
           ...p,
           name: String(anyP.name ?? ''),
@@ -87,6 +105,8 @@ const Products = () => {
           unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
           stockQuantity: Number.isFinite(stockQuantity) ? stockQuantity : 0,
           description: String(anyP.description ?? ''),
+          taxGroup: (typeof taxGroupRaw === 'string' ? taxGroupRaw : undefined) as Product['taxGroup'],
+          tvaRate: Number.isFinite(tvaRate) ? tvaRate : undefined,
         } as Product;
       });
       setProducts(normalized);
@@ -117,6 +137,8 @@ const Products = () => {
       unitPrice: parseFloat(formData.unitPrice),
       stockQuantity: parseInt(formData.stockQuantity),
       description: formData.description,
+      taxGroup: formData.taxGroup,
+      tvaRate: taxGroupToTvaRate(formData.taxGroup),
     };
 
     if (editingProduct) {
@@ -141,6 +163,7 @@ const Products = () => {
       unitPrice: product.unitPrice.toString(),
       stockQuantity: product.stockQuantity.toString(),
       description: product.description,
+      taxGroup: (product.taxGroup || 'B') as NonNullable<Product['taxGroup']>,
     });
     setIsDialogOpen(true);
   };
@@ -156,6 +179,7 @@ const Products = () => {
       unitPrice: '',
       stockQuantity: '',
       description: '',
+      taxGroup: 'B',
     });
   };
 
@@ -260,6 +284,25 @@ const Products = () => {
                             placeholder="Premier Grand Cru Classé"
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label>Groupe de taxation *</Label>
+                          <Select
+                            value={formData.taxGroup}
+                            onValueChange={(val) => setFormData({ ...formData, taxGroup: val as NonNullable<Product['taxGroup']> })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="B">B — TVA 18%</SelectItem>
+                              <SelectItem value="C">C — TVA 10%</SelectItem>
+                              <SelectItem value="D">D — TVA 5%</SelectItem>
+                              <SelectItem value="A">A — Exonéré 0%</SelectItem>
+                              <SelectItem value="E">E — TVA 0%</SelectItem>
+                              <SelectItem value="EXPORT">EXPORT — TVA 0%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="flex gap-2 justify-end">
                           <Button type="button" variant="outline" onClick={handleDialogClose}>
                             Annuler
@@ -288,6 +331,7 @@ const Products = () => {
                     <TableRow>
                       <TableHead>Nom</TableHead>
                       <TableHead>Catégorie</TableHead>
+                      <TableHead>Taxation</TableHead>
                       <TableHead>Prix unitaire</TableHead>
                       <TableHead>Stock</TableHead>
                       <TableHead>Description</TableHead>
@@ -299,6 +343,9 @@ const Products = () => {
                       <TableRow key={product.id}>
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.category}</TableCell>
+                        <TableCell>
+                          {(product.taxGroup || 'B')} ({(product.tvaRate ?? taxGroupToTvaRate((product.taxGroup || 'B') as NonNullable<Product['taxGroup']>))}%)
+                        </TableCell>
                         <TableCell>{product.unitPrice.toLocaleString('fr-FR')} FCFA</TableCell>
                         <TableCell>
                           <span className={product.stockQuantity < 5 ? 'text-destructive font-semibold' : ''}>

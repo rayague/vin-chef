@@ -151,6 +151,10 @@ function ensureSchema() {
       invoiceCols.push(colName);
     }
   };
+  addInvoiceColIfMissing('invoice_type', "TEXT DEFAULT 'FV'");
+  addInvoiceColIfMissing('original_invoice_reference', 'TEXT');
+  addInvoiceColIfMissing('aib_rate', 'INTEGER DEFAULT 0');
+  addInvoiceColIfMissing('payment_methods', 'TEXT');
   addInvoiceColIfMissing('emcf_uid', 'TEXT');
   addInvoiceColIfMissing('emcf_status', 'TEXT');
   addInvoiceColIfMissing('emcf_code_mec_e_f_dgi', 'TEXT');
@@ -162,6 +166,27 @@ function ensureSchema() {
   addInvoiceColIfMissing('emcf_raw_response', 'TEXT');
   addInvoiceColIfMissing('emcf_submitted_at', 'TEXT');
   addInvoiceColIfMissing('emcf_confirmed_at', 'TEXT');
+
+  const productCols = db.prepare('PRAGMA table_info(products)').all().map((r) => r.name);
+  const addProductColIfMissing = (colName, colDef) => {
+    if (!productCols.includes(colName)) {
+      db.prepare(`ALTER TABLE products ADD COLUMN ${colName} ${colDef}`).run();
+      productCols.push(colName);
+    }
+  };
+  addProductColIfMissing('tax_group', "TEXT DEFAULT 'B'");
+  addProductColIfMissing('tva_rate', 'INTEGER DEFAULT 18');
+
+  const clientCols = db.prepare('PRAGMA table_info(clients)').all().map((r) => r.name);
+  const addClientColIfMissing = (colName, colDef) => {
+    if (!clientCols.includes(colName)) {
+      db.prepare(`ALTER TABLE clients ADD COLUMN ${colName} ${colDef}`).run();
+      clientCols.push(colName);
+    }
+  };
+  addClientColIfMissing('ifu', 'TEXT');
+  addClientColIfMissing('aib_registration', 'INTEGER DEFAULT 0');
+  addClientColIfMissing('aib_rate', 'INTEGER DEFAULT 0');
 }
 
 function init(app) {
@@ -253,8 +278,10 @@ function init(app) {
       // Support both camelCase and snake_case incoming product shapes from tests or other callers
       const unitPrice = product.unitPrice ?? product.unit_price;
       const stockQuantity = product.stockQuantity ?? product.stock_quantity;
-      db.prepare('INSERT INTO products (id, name, category, unit_price, stock_quantity, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(product.id, product.name, product.category || null, unitPrice, stockQuantity, product.description || null, now);
+      const taxGroup = product.taxGroup ?? product.tax_group ?? 'B';
+      const tvaRate = product.tvaRate ?? product.tva_rate ?? 18;
+      db.prepare('INSERT INTO products (id, name, category, unit_price, stock_quantity, description, tax_group, tva_rate, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(product.id, product.name, product.category || null, unitPrice, stockQuantity, product.description || null, taxGroup, tvaRate, now);
       return db.prepare('SELECT * FROM products WHERE id = ?').get(product.id);
     },
     updateProduct: (id, updates) => {
@@ -264,8 +291,10 @@ function init(app) {
       // accept either naming style for unit price / stock quantity
       const unitPrice = updated.unit_price ?? updated.unitPrice;
       const stockQuantity = updated.stock_quantity ?? updated.stockQuantity;
-      db.prepare('UPDATE products SET name = ?, category = ?, unit_price = ?, stock_quantity = ?, description = ?, updated_at = ? WHERE id = ?')
-        .run(updated.name, updated.category, unitPrice, stockQuantity, updated.description, updated.updated_at, id);
+      const taxGroup = updated.tax_group ?? updated.taxGroup ?? existing.tax_group ?? 'B';
+      const tvaRate = updated.tva_rate ?? updated.tvaRate ?? existing.tva_rate ?? 18;
+      db.prepare('UPDATE products SET name = ?, category = ?, unit_price = ?, stock_quantity = ?, description = ?, tax_group = ?, tva_rate = ?, updated_at = ? WHERE id = ?')
+        .run(updated.name, updated.category, unitPrice, stockQuantity, updated.description, taxGroup, tvaRate, updated.updated_at, id);
       return db.prepare('SELECT * FROM products WHERE id = ?').get(id);
     },
     deleteProduct: (id) => db.prepare('DELETE FROM products WHERE id = ?').run(id),
@@ -274,8 +303,11 @@ function init(app) {
     getClients: () => db.prepare('SELECT * FROM clients').all(),
     addClient: (client) => {
       const now = new Date().toISOString();
-      db.prepare('INSERT INTO clients (id, name, contact_info, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(client.id, client.name, client.contactInfo || null, client.email || null, client.phone || null, client.address || null, now);
+      const ifu = client.ifu ?? null;
+      const aibRegistration = client.aibRegistration ? 1 : (client.aib_registration ? 1 : 0);
+      const aibRate = client.aibRate ?? client.aib_rate ?? 0;
+      db.prepare('INSERT INTO clients (id, name, contact_info, email, phone, address, ifu, aib_registration, aib_rate, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(client.id, client.name, client.contactInfo || null, client.email || null, client.phone || null, client.address || null, ifu, aibRegistration, aibRate, now);
       return db.prepare('SELECT * FROM clients WHERE id = ?').get(client.id);
     },
     // Categories
@@ -299,8 +331,11 @@ function init(app) {
       const existing = db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
       if (!existing) return null;
       const updated = { ...existing, ...updates };
-      db.prepare('UPDATE clients SET name = ?, contact_info = ?, email = ?, phone = ?, address = ? WHERE id = ?')
-        .run(updated.name, updated.contact_info ?? updated.contactInfo, updated.email, updated.phone, updated.address, id);
+      const nextIfu = updated.ifu ?? existing.ifu ?? null;
+      const nextAibRegistration = (updated.aib_registration ?? (updated.aibRegistration ? 1 : 0)) ? 1 : 0;
+      const nextAibRate = updated.aib_rate ?? updated.aibRate ?? existing.aib_rate ?? 0;
+      db.prepare('UPDATE clients SET name = ?, contact_info = ?, email = ?, phone = ?, address = ?, ifu = ?, aib_registration = ?, aib_rate = ? WHERE id = ?')
+        .run(updated.name, updated.contact_info ?? updated.contactInfo, updated.email, updated.phone, updated.address, nextIfu, nextAibRegistration, nextAibRate, id);
       return db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
     },
     deleteClient: (id) => db.prepare('DELETE FROM clients WHERE id = ?').run(id),
@@ -358,6 +393,10 @@ function init(app) {
     },
     createInvoice: (invoice) => {
       const now = new Date().toISOString();
+      const invoiceType = invoice.invoice_type ?? invoice.invoiceType ?? 'FV';
+      const originalInvoiceReference = invoice.original_invoice_reference ?? invoice.originalInvoiceReference ?? null;
+      const aibRate = invoice.aib_rate ?? invoice.aibRate ?? 0;
+      const paymentMethods = invoice.payment_methods ?? (invoice.paymentMethods ? JSON.stringify(invoice.paymentMethods) : null);
       const emcfUid = invoice.emcf_uid ?? invoice.emcfUid ?? null;
       const emcfStatus = invoice.emcf_status ?? invoice.emcfStatus ?? null;
       const emcfCode = invoice.emcf_code_mec_e_f_dgi ?? invoice.emcfCodeMECeFDGI ?? null;
@@ -370,7 +409,7 @@ function init(app) {
       const emcfSubmittedAt = invoice.emcf_submitted_at ?? invoice.emcfSubmittedAt ?? null;
       const emcfConfirmedAt = invoice.emcf_confirmed_at ?? invoice.emcfConfirmedAt ?? null;
       db.prepare(
-        'INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, emcf_uid, emcf_status, emcf_code_mec_e_f_dgi, emcf_qr_code, emcf_date_time, emcf_counters, emcf_nim, emcf_pos_id, emcf_raw_response, emcf_submitted_at, emcf_confirmed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, invoice_type, original_invoice_reference, aib_rate, payment_methods, emcf_uid, emcf_status, emcf_code_mec_e_f_dgi, emcf_qr_code, emcf_date_time, emcf_counters, emcf_nim, emcf_pos_id, emcf_raw_response, emcf_submitted_at, emcf_confirmed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       )
         .run(
           invoice.id,
@@ -383,6 +422,10 @@ function init(app) {
           invoice.tva || 0,
           invoice.ifu || null,
           invoice.immutableFlag ? 1 : 0,
+          invoiceType,
+          originalInvoiceReference,
+          aibRate,
+          paymentMethods,
           emcfUid,
           emcfStatus,
           emcfCode,
@@ -428,34 +471,69 @@ function init(app) {
         const emcfRawResponse = i.emcf_raw_response ?? (i.emcfRawResponse ? (typeof i.emcfRawResponse === 'string' ? i.emcfRawResponse : JSON.stringify(i.emcfRawResponse)) : null);
         const emcfSubmittedAt = i.emcf_submitted_at ?? i.emcfSubmittedAt ?? null;
         const emcfConfirmedAt = i.emcf_confirmed_at ?? i.emcfConfirmedAt ?? null;
+        const invoiceType = i.invoice_type ?? i.invoiceType ?? 'FV';
+        const originalInvoiceReference = i.original_invoice_reference ?? i.originalInvoiceReference ?? null;
+        const aibRate = i.aib_rate ?? i.aibRate ?? 0;
+        const paymentMethods = i.payment_methods ?? (i.paymentMethods ? JSON.stringify(i.paymentMethods) : null);
         // insert invoice
-        db.prepare(
-          'INSERT INTO invoices (id, invoice_number, sale_id, date, client_snapshot, product_snapshot, total_price, tva, ifu, immutable_flag, emcf_uid, emcf_status, emcf_code_mec_e_f_dgi, emcf_qr_code, emcf_date_time, emcf_counters, emcf_nim, emcf_pos_id, emcf_raw_response, emcf_submitted_at, emcf_confirmed_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        )
-          .run(
-            i.id,
-            i.invoiceNumber,
-            s.id,
-            i.date,
-            i.clientSnapshot || null,
-            i.productSnapshot || null,
-            i.totalPrice,
-            i.tva || 0,
-            i.ifu || null,
-            i.immutableFlag ? 1 : 0,
-            emcfUid,
-            emcfStatus,
-            emcfCode,
-            emcfQr,
-            emcfDateTime,
-            emcfCounters,
-            emcfNim,
-            emcfPosId,
-            emcfRawResponse,
-            emcfSubmittedAt,
-            emcfConfirmedAt,
-            now
-          );
+        const invCols = [
+          'id',
+          'invoice_number',
+          'sale_id',
+          'date',
+          'client_snapshot',
+          'product_snapshot',
+          'total_price',
+          'tva',
+          'ifu',
+          'immutable_flag',
+          'invoice_type',
+          'original_invoice_reference',
+          'aib_rate',
+          'payment_methods',
+          'emcf_uid',
+          'emcf_status',
+          'emcf_code_mec_e_f_dgi',
+          'emcf_qr_code',
+          'emcf_date_time',
+          'emcf_counters',
+          'emcf_nim',
+          'emcf_pos_id',
+          'emcf_raw_response',
+          'emcf_submitted_at',
+          'emcf_confirmed_at',
+          'created_at',
+        ];
+        const invValues = [
+          i.id,
+          i.invoiceNumber,
+          s.id,
+          i.date,
+          i.clientSnapshot || null,
+          i.productSnapshot || null,
+          i.totalPrice,
+          i.tva || 0,
+          i.ifu || null,
+          i.immutableFlag ? 1 : 0,
+          invoiceType,
+          originalInvoiceReference,
+          aibRate,
+          paymentMethods,
+          emcfUid,
+          emcfStatus,
+          emcfCode,
+          emcfQr,
+          emcfDateTime,
+          emcfCounters,
+          emcfNim,
+          emcfPosId,
+          emcfRawResponse,
+          emcfSubmittedAt,
+          emcfConfirmedAt,
+          now,
+        ];
+        const invSql = `INSERT INTO invoices (${invCols.join(', ')}) VALUES (${invCols.map(() => '?').join(', ')})`;
+        db.prepare(invSql).run(...invValues);
       });
       try {
         tx(sale, invoice);
@@ -473,6 +551,7 @@ function init(app) {
       return rows.map((r) => {
         const clientSnap = safeJsonParse(r.client_snapshot) || null;
         const productSnap = safeJsonParse(r.product_snapshot) || null;
+        const paymentMethods = safeJsonParse(r.payment_methods) || undefined;
 
         let productName = '—';
         let quantity = 0;
@@ -510,9 +589,9 @@ function init(app) {
         const clientAddress = (clientSnap && clientSnap.address) ? clientSnap.address : undefined;
 
         return {
-          ...r,
-          invoiceNumber: r.invoice_number,
+          id: r.id,
           saleId: r.sale_id,
+          invoiceNumber: r.invoice_number,
           date: r.date,
           clientName,
           clientIFU,
@@ -525,6 +604,10 @@ function init(app) {
           totalPrice: r.total_price,
           tva: r.tva || 0,
           tvaRate: 18,
+          invoiceType: r.invoice_type || 'FV',
+          originalInvoiceReference: r.original_invoice_reference || undefined,
+          aibRate: typeof r.aib_rate === 'number' ? r.aib_rate : Number(r.aib_rate || 0),
+          paymentMethods,
           immutableFlag: r.immutable_flag === 1,
           createdAt: r.created_at,
           emcfUid: r.emcf_uid,
@@ -550,8 +633,12 @@ function init(app) {
         updated.emcf_code_mec_e_f_dgi ??
         updated.emcfCodeMECeFDGI ??
         updated.emcf_code_mec_e_f_dgi;
+      const invoiceType = updated.invoice_type ?? updated.invoiceType ?? row.invoice_type ?? 'FV';
+      const originalInvoiceReference = updated.original_invoice_reference ?? updated.originalInvoiceReference ?? row.original_invoice_reference ?? null;
+      const aibRate = updated.aib_rate ?? updated.aibRate ?? row.aib_rate ?? 0;
+      const paymentMethods = updated.payment_methods ?? (updated.paymentMethods ? JSON.stringify(updated.paymentMethods) : row.payment_methods ?? null);
       db.prepare(
-        'UPDATE invoices SET invoice_number = ?, date = ?, client_snapshot = ?, product_snapshot = ?, total_price = ?, tva = ?, ifu = ?, immutable_flag = ?, emcf_uid = ?, emcf_status = ?, emcf_code_mec_e_f_dgi = ?, emcf_qr_code = ?, emcf_date_time = ?, emcf_counters = ?, emcf_nim = ?, emcf_pos_id = ?, emcf_raw_response = ?, emcf_submitted_at = ?, emcf_confirmed_at = ? WHERE id = ?'
+        'UPDATE invoices SET invoice_number = ?, date = ?, client_snapshot = ?, product_snapshot = ?, total_price = ?, tva = ?, ifu = ?, immutable_flag = ?, invoice_type = ?, original_invoice_reference = ?, aib_rate = ?, payment_methods = ?, emcf_uid = ?, emcf_status = ?, emcf_code_mec_e_f_dgi = ?, emcf_qr_code = ?, emcf_date_time = ?, emcf_counters = ?, emcf_nim = ?, emcf_pos_id = ?, emcf_raw_response = ?, emcf_submitted_at = ?, emcf_confirmed_at = ? WHERE id = ?'
       )
         .run(
           updated.invoice_number ?? updated.invoiceNumber,
@@ -562,6 +649,10 @@ function init(app) {
           updated.tva,
           updated.ifu,
           updated.immutable_flag ?? (updated.immutableFlag ? 1 : 0),
+          invoiceType,
+          originalInvoiceReference,
+          aibRate,
+          paymentMethods,
           updated.emcf_uid ?? updated.emcfUid,
           updated.emcf_status ?? updated.emcfStatus,
           emcfCode,

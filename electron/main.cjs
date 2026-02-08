@@ -296,13 +296,108 @@ app.whenReady().then(() => {
     };
   };
 
+  const {
+    validateInvoicePayload,
+    normalizeEmcfPayload,
+    makeSafeLogMeta,
+  } = require('./emcf-validation.cjs');
+
+  let emcfInfo = {
+    nim: null,
+    ifu: null,
+    serverDateTime: null,
+    lastUpdated: null,
+  };
+
+  const updateEmcfInfoFromStatus = (result) => {
+    if (!result || !result.nim || !result.ifu) return false;
+    emcfInfo = {
+      nim: String(result.nim),
+      ifu: String(result.ifu),
+      serverDateTime: result.serverDateTime ? String(result.serverDateTime) : null,
+      lastUpdated: new Date().toISOString(),
+    };
+    console.log('[e-MCF] Infos stockées:', { nim: emcfInfo.nim, ifu: emcfInfo.ifu });
+    return true;
+  };
+
+  const refreshEmcfInfoIfExpired = async ({ invoiceBaseUrl, token }) => {
+    const refreshMinutes = Number(process.env.EMCF_INFO_REFRESH_MINUTES || 0);
+    if (!refreshMinutes || refreshMinutes <= 0) return false;
+    if (!emcfInfo.lastUpdated) return false;
+    const expired = Date.now() - new Date(emcfInfo.lastUpdated).getTime() > refreshMinutes * 60 * 1000;
+    if (!expired) return false;
+    try {
+      const statusResult = await fetchJson({ url: invoiceBaseUrl, method: 'GET', token });
+      return updateEmcfInfoFromStatus(statusResult);
+    } catch (err) {
+      const msg = err && err.message ? String(err.message) : 'UNKNOWN_ERROR';
+      console.warn('[e-MCF] Rafraîchissement infos NIM/IFU échoué:', msg);
+      return false;
+    }
+  };
+
   ipcMain.handle('emcf.submitInvoice', async (event, payload, options) => {
     const posId = options && options.posId ? options.posId : null;
     const creds = resolveEmcfCreds(posId);
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
     if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
     const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
-    return fetchJson({ url: invoiceBaseUrl, method: 'POST', token: creds.token, body: payload });
+
+    // If configured, refresh cached NIM/IFU automatically when expired
+    await refreshEmcfInfoIfExpired({ invoiceBaseUrl, token: creds.token });
+
+    let normalizedPayload;
+    try {
+      validateInvoicePayload(payload);
+      normalizedPayload = normalizeEmcfPayload(payload, emcfInfo);
+
+      const refreshMinutes = Number(process.env.EMCF_INFO_REFRESH_MINUTES || 0);
+      const isExpired =
+        !!emcfInfo.lastUpdated &&
+        (refreshMinutes > 0
+          ? Date.now() - new Date(emcfInfo.lastUpdated).getTime() > refreshMinutes * 60 * 1000
+          : false);
+      if (!normalizedPayload.nim || !normalizedPayload.ifuVendeur) {
+        console.warn('[e-MCF] Attention: NIM ou IFU vendeur manquant (appeler emcf.status recommandé)', {
+          hasNim: !!normalizedPayload.nim,
+          hasIfuVendeur: !!normalizedPayload.ifuVendeur,
+        });
+      } else if (isExpired) {
+        console.warn('[e-MCF] Attention: infos NIM/IFU potentiellement expirées, rafraîchissement recommandé', {
+          lastUpdated: emcfInfo.lastUpdated,
+          refreshMinutes,
+        });
+      }
+
+      console.log('[e-MCF] Payload validé:', {
+        ...makeSafeLogMeta(normalizedPayload),
+        hasNim: !!normalizedPayload.nim,
+        hasIfuVendeur: !!normalizedPayload.ifuVendeur,
+        dateTime: normalizedPayload.dateTime,
+      });
+    } catch (err) {
+      const msg = err && err.message ? String(err.message) : 'VALIDATION_FAILED';
+      console.error('[e-MCF] Validation payload échouée:', { error: msg });
+      throw new Error(`E_MCF_VALIDATION_FAILED: ${msg}`);
+    }
+
+    try {
+      const result = await fetchJson({ url: invoiceBaseUrl, method: 'POST', token: creds.token, body: normalizedPayload });
+      if (!result || !result.uid) {
+        throw new Error('API_RETOUR_INVALIDE: Réponse API sans UID');
+      }
+      return result;
+    } catch (error) {
+      const msg = error && error.message ? String(error.message) : 'UNKNOWN_ERROR';
+      console.error('[e-MCF] Erreur soumission:', {
+        error: msg,
+        payloadType: normalizedPayload && normalizedPayload.type ? normalizedPayload.type : undefined,
+        validation: 'FAILED',
+        stack: error && error.stack ? String(error.stack) : undefined,
+      });
+      throw new Error(`E_MCF_SUBMISSION_FAILED: ${msg}`);
+    }
   });
 
   const finalizeInvoice = async ({ uid, action, posId }) => {
@@ -366,7 +461,15 @@ app.whenReady().then(() => {
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
     if (!creds.token) throw new Error('e-MCF is not configured (missing token)');
     const invoiceBaseUrl = normalizeInvoiceBaseUrl(creds.baseUrl);
-    return fetchJson({ url: invoiceBaseUrl, method: 'GET', token: creds.token });
+    try {
+      const result = await fetchJson({ url: invoiceBaseUrl, method: 'GET', token: creds.token });
+      updateEmcfInfoFromStatus(result);
+      return result;
+    } catch (error) {
+      const msg = error && error.message ? String(error.message) : 'UNKNOWN_ERROR';
+      console.error('[e-MCF] Erreur status:', msg);
+      throw error;
+    }
   });
 
   // Authentication handler: validate credentials against DB (bcrypt)
