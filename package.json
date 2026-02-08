@@ -17,6 +17,28 @@
     "test:integration": "vitest --run --dir test/integration --environment node",
     "emcf:test": "node ./run_tests_emcf.mjs"
   },
+  "build": {
+    "appId": "com.vinchef.app",
+    "productName": "Vin-Chef",
+    "directories": {
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "public/**",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "icon": "build/icon.png"
+    }
+  },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
