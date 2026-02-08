@@ -6,7 +6,23 @@ const ALLOWED_AIB_RATES = new Set([0, 1, 5]);
 const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
 const toNumber = (v) => {
-  const n = typeof v === 'number' ? v : Number(v);
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+
+  // Accept formatted numbers like "280 000", "280\u00A0000", "280\u202F000"
+  const raw = String(v).trim();
+  if (!raw) return null;
+
+  const cleaned = raw
+    .replace(/[\s\u00A0\u202F]/g, '')
+    .replace(/[^0-9,.-]/g, '')
+    // If comma is used as decimal separator, normalize to dot.
+    .replace(/,(?=\d{1,2}$)/, '.')
+    // Otherwise remove remaining commas used as thousands separators.
+    .replace(/,/g, '');
+
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 };
 

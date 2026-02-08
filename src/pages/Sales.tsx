@@ -93,6 +93,19 @@ const Sales = () => {
     return 0;
   };
 
+  const parseMoney = (v: unknown): number => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+    const s = String(v ?? '').trim();
+    if (!s) return NaN;
+    const cleaned = s
+      .replace(/[\s\u00A0\u202F]/g, '')
+      .replace(/[^0-9,.-]/g, '')
+      .replace(/,(?=\d{1,2}$)/, '.')
+      .replace(/,/g, '');
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : NaN;
+  };
+
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -223,14 +236,15 @@ const Sales = () => {
     for (const it of validItems) {
       const prod = products.find(p => p.id === it.productId)!;
       const q = Number.parseInt(String(it.quantity), 10);
-      const unit = Number((prod as unknown as { unitPrice?: unknown }).unitPrice);
+      const unit = parseMoney((prod as unknown as { unitPrice?: unknown }).unitPrice);
 
       if (!Number.isFinite(q) || q <= 0) {
         toast({ title: 'Erreur', description: 'Quantité invalide', variant: 'destructive' });
         return;
       }
+
       if (!Number.isFinite(unit) || unit < 0) {
-        toast({ title: 'Erreur', description: `Prix invalide pour ${prod.name}`, variant: 'destructive' });
+        toast({ title: 'Erreur', description: `Prix unitaire invalide pour ${prod.name}`, variant: 'destructive' });
         return;
       }
 
@@ -293,7 +307,7 @@ const Sales = () => {
 
         const emcfItems = normalizedItems.map(it => {
           const prod = products.find(p => p.id === it.productId)!;
-          const unit = Number(prod.unitPrice);
+          const unit = parseMoney(prod.unitPrice);
           const unitInt = Math.round(unit);
 
           const d = Number(it.discount || 0);
@@ -309,17 +323,18 @@ const Sales = () => {
           return {
             code: prod.id,
             name: prod.name,
+            unitPrice: price,
             price,
             quantity: it.quantity,
             taxGroup,
           };
         });
 
-        const totalHTInt = emcfItems.reduce((s, it) => s + it.price * it.quantity, 0);
+        const totalHTInt = emcfItems.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
         const tvaInt = emcfItems.reduce((s, it) => {
           const g = String((it as unknown as { taxGroup?: string }).taxGroup || 'B').toUpperCase() as NonNullable<Product['taxGroup']>;
           const rate = taxGroupToTvaRate(g);
-          return s + Math.round((it.price * it.quantity) * (rate / 100));
+          return s + Math.round((it.unitPrice * it.quantity) * (rate / 100));
         }, 0);
         const aibInt = Math.round(totalHTInt * (aibRate / 100));
         const totalTTCInt = totalHTInt + tvaInt + aibInt;
@@ -636,42 +651,34 @@ const Sales = () => {
                     Nouvelle Vente
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Enregistrer une vente</DialogTitle>
                   </DialogHeader>
                   {emcfPending ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="font-semibold">Pré-validation e-MCF</div>
-                          <div className="text-sm text-muted-foreground">UID: {emcfPending.uid}</div>
+                    <div className="flex flex-col gap-4 min-h-0">
+                      <div className="flex-1 overflow-y-auto pr-1 min-h-0 space-y-4">
+                        <div className="rounded-md border p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-semibold">Pré-validation e-MCF en attente</div>
+                              <div className="text-xs text-muted-foreground">UID: {emcfPending.uid}</div>
+                            </div>
+                            <Badge variant={emcfSecondsLeft <= 0 ? 'destructive' : 'secondary'}>
+                              {emcfSecondsLeft <= 0 ? 'Expiré' : `Expire dans ${emcfSecondsLeft}s`}
+                            </Badge>
+                          </div>
                         </div>
-                        <Badge variant={emcfSecondsLeft > 0 ? 'secondary' : 'destructive'}>
-                          {emcfSecondsLeft > 0 ? `Temps restant: ${emcfSecondsLeft}s` : 'Expirée'}
-                        </Badge>
-                      </div>
 
-                      <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span>Total HT:</span>
-                          <span className="font-medium">{emcfPending.totals.totalHT.toLocaleString('fr-FR')} FCFA</span>
-                        </div>
-                        <div className="flex justify-between text-destructive">
-                          <span>Remise totale:</span>
-                          <span className="font-medium">- {emcfPending.totals.totalDiscount.toLocaleString('fr-FR')} FCFA</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>TVA (18%):</span>
-                          <span className="font-medium">{emcfPending.totals.tva.toLocaleString('fr-FR')} FCFA</span>
-                        </div>
-                        <div className="flex justify-between font-bold text-base pt-1 border-t">
-                          <span>Total TTC:</span>
-                          <span>{emcfPending.totals.totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                        <div className="rounded-md border p-3">
+                          <div className="text-sm font-semibold">Totaux</div>
+                          <div className="mt-2 text-sm text-muted-foreground">HT: {emcfPending.totals.totalHT.toLocaleString('fr-FR')} FCFA</div>
+                          <div className="text-sm text-muted-foreground">TVA: {emcfPending.totals.tva.toLocaleString('fr-FR')} FCFA</div>
+                          <div className="text-sm font-semibold">TTC: {emcfPending.totals.totalTTC.toLocaleString('fr-FR')} FCFA</div>
                         </div>
                       </div>
 
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-end pt-3 border-t">
                         <Button type="button" variant="outline" disabled={saving} onClick={() => void handleEmcfFinalize('cancel')}>
                           Annuler e-MCF
                         </Button>
@@ -681,37 +688,35 @@ const Sales = () => {
                       </div>
                     </div>
                   ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Type de facture *</Label>
-                        <Select value={formData.invoiceType} onValueChange={(v) => setFormData((prev) => ({ ...prev, invoiceType: v as NonNullable<Invoice['invoiceType']> }))}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="FV">Facture de vente (FV)</SelectItem>
-                            <SelectItem value="AV">Facture d'avoir (AV)</SelectItem>
-                            <SelectItem value="FV_EXPORT">Vente export (TVA 0%)</SelectItem>
-                            <SelectItem value="AV_EXPORT">Avoir export (TVA 0%)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {(formData.invoiceType === 'AV' || formData.invoiceType === 'AV_EXPORT') && (
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 min-h-0">
+                      <div className="flex-1 overflow-y-auto pr-1 min-h-0 space-y-4">
                         <div className="space-y-2">
-                          <Label>Référence facture originale *</Label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <Input
-                              value={formData.originalInvoiceReference}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, originalInvoiceReference: e.target.value }))}
-                              placeholder="UID ou code MECeF (24)"
-                            />
+                          <Label>Type de facture *</Label>
+                          <Select
+                            value={formData.invoiceType}
+                            onValueChange={(v) => setFormData((prev) => ({ ...prev, invoiceType: v as NonNullable<Invoice['invoiceType']> }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FV">Facture de vente (FV)</SelectItem>
+                              <SelectItem value="FV_EXPORT">Facture export (FV_EXPORT)</SelectItem>
+                              <SelectItem value="AV">Avoir (AV)</SelectItem>
+                              <SelectItem value="AV_EXPORT">Avoir export (AV_EXPORT)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {(formData.invoiceType === 'AV' || formData.invoiceType === 'AV_EXPORT') ? (
+                          <div className="space-y-2">
+                            <Label>Référence facture originale *</Label>
                             <Select
                               value={formData.originalInvoiceReference || '__none'}
                               onValueChange={(v) => setFormData((prev) => ({ ...prev, originalInvoiceReference: v === '__none' ? '' : v }))}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="Choisir une facture" />
+                                <SelectValue placeholder="Sélectionner une facture normalisée" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none">—</SelectItem>
@@ -733,12 +738,11 @@ const Sales = () => {
                                   })}
                               </SelectContent>
                             </Select>
+                            <p className="text-xs text-muted-foreground">On enverra plusieurs variantes de champ (Option C) pour maximiser la compatibilité API.</p>
                           </div>
-                          <p className="text-xs text-muted-foreground">On enverra plusieurs variantes de champ (Option C) pour maximiser la compatibilité API.</p>
-                        </div>
-                      )}
+                        ) : null}
 
-                      <div className="space-y-2">
+                        <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <div className="flex-1">
                               <Label>Client *</Label>
@@ -757,175 +761,176 @@ const Sales = () => {
                               <Button type="button" size="sm" variant="outline" onClick={() => setIsClientDialogOpen(true)}>Ajouter client</Button>
                             </div>
                           </div>
-                      </div>
-
-                      <div className="flex items-center justify-between rounded-md border p-3">
-                        <div className="space-y-1">
-                          <div className="text-sm font-medium">Normaliser avec e-MCF</div>
-                          <div className="text-xs text-muted-foreground">
-                            {emcf.isAvailable() ? (
-                              emcfActivePos ? `POS actif: ${emcfActivePos.name}` : 'Aucun POS actif'
-                            ) : (
-                              'Disponible uniquement sur Electron'
-                            )}
-                          </div>
                         </div>
-                        <Switch
-                          checked={normalizeWithEmcf}
-                          onCheckedChange={(v) => setNormalizeWithEmcf(v)}
-                          disabled={!emcf.isAvailable() || !emcfActivePos}
-                        />
-                      </div>
 
-                      <div className="space-y-2">
-                        <Label>Produits *</Label>
-                        <div className="space-y-2">
-                          {items.map((it, idx) => (
-                            <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                              <div className="col-span-5">
-                                <Label className="text-xs">Produit</Label>
-                                <Select value={it.productId} onValueChange={(value) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, productId: value } : p))}>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner un produit" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {products.map(product => (
-                                      <SelectItem key={product.id} value={product.id}>{product.name} - Stock: {product.stockQuantity}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="col-span-2">
-                                <Label className="text-xs">Quantité</Label>
-                                <Input type="number" min="1" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
-                              </div>
-                              <div className="col-span-2">
-                                <Label className="text-xs">Type Remise</Label>
-                                <Select value={it.discountType} onValueChange={(value: 'percentage' | 'fixed') => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discountType: value } : p))}>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="percentage">%</SelectItem>
-                                    <SelectItem value="fixed">FCFA</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="col-span-2">
-                                <Label className="text-xs">Valeur Remise</Label>
-                                <Input type="number" min="0" value={it.discount} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discount: e.target.value } : p))} />
-                              </div>
-                              <div className="col-span-1">
-                                <Label className="text-xs"> </Label>
-                                <div className="flex gap-1">
-                                  <Button type="button" variant="ghost" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>Suppr</Button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <div>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-semibold">Récapitulatif</Label>
-                        </div>
                         <div className="flex items-center justify-between rounded-md border p-3">
                           <div className="space-y-1">
-                            <div className="text-sm font-medium">AIB</div>
+                            <div className="text-sm font-medium">Normaliser avec e-MCF</div>
                             <div className="text-xs text-muted-foreground">
-                              {(() => {
-                                const c = clients.find(x => x.id === formData.clientId);
-                                if (!c) return '—';
-                                if (!c.aibRegistration) return 'Non assujetti (0%)';
-                                return `Assujetti (${c.aibRate ?? 0}%)`;
-                              })()}
+                              {emcf.isAvailable() ? (
+                                emcfActivePos ? `POS actif: ${emcfActivePos.name}` : 'Aucun POS actif'
+                              ) : (
+                                'Disponible uniquement sur Electron'
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">Override</Label>
-                            <select
-                              className="rounded border px-2 py-1 text-sm"
-                              value={formData.aibRateOverride}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, aibRateOverride: e.target.value as '' | '0' | '1' | '5' }))}
-                            >
-                              <option value="">Auto</option>
-                              <option value="0">0%</option>
-                              <option value="1">1%</option>
-                              <option value="5">5%</option>
-                            </select>
+                          <Switch
+                            checked={normalizeWithEmcf}
+                            onCheckedChange={(v) => setNormalizeWithEmcf(v)}
+                            disabled={!emcf.isAvailable() || !emcfActivePos}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Produits *</Label>
+                          <div className="space-y-2">
+                            {items.map((it, idx) => (
+                              <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                                <div className="col-span-5">
+                                  <Label className="text-xs">Produit</Label>
+                                  <Select value={it.productId} onValueChange={(value) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, productId: value } : p))}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Sélectionner un produit" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {products.map(product => (
+                                        <SelectItem key={product.id} value={product.id}>{product.name} - Stock: {product.stockQuantity}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="col-span-2">
+                                  <Label className="text-xs">Quantité</Label>
+                                  <Input type="number" min="1" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
+                                </div>
+                                <div className="col-span-2">
+                                  <Label className="text-xs">Type Remise</Label>
+                                  <Select value={it.discountType} onValueChange={(value: 'percentage' | 'fixed') => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discountType: value } : p))}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="percentage">%</SelectItem>
+                                      <SelectItem value="fixed">FCFA</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="col-span-2">
+                                  <Label className="text-xs">Valeur Remise</Label>
+                                  <Input type="number" min="0" value={it.discount} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discount: e.target.value } : p))} />
+                                </div>
+                                <div className="col-span-1">
+                                  <Label className="text-xs"> </Label>
+                                  <div className="flex gap-1">
+                                    <Button type="button" variant="ghost" onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>Suppr</Button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <div>
+                              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
+                            </div>
                           </div>
                         </div>
-                        {(() => {
-                          const validItems = items.filter(it => it.productId && Number.parseInt(String(it.quantity), 10) > 0);
-                          if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
-                          let totalHT = 0;
-                          let totalDiscount = 0;
-                          let totalVat = 0;
-                          for (const it of validItems) {
-                            const prod = products.find(p => p.id === it.productId);
-                            if (!prod) continue;
-                            const q = Number.parseInt(String(it.quantity), 10);
-                            const unit = Number((prod as unknown as { unitPrice?: unknown }).unitPrice);
-                            if (!Number.isFinite(q) || q <= 0) continue;
-                            if (!Number.isFinite(unit) || unit < 0) continue;
 
-                            const d = Number.parseFloat(String(it.discount || '')) || 0;
-                            let discountAmount = 0;
-                            if (d > 0) {
-                              if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
-                              else discountAmount = d * q;
-                            }
-                            totalHT += unit * q - discountAmount;
-                            totalDiscount += discountAmount;
-
-                            const g = ((prod as unknown as Product).taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
-                            const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
-                            totalVat += Math.round((unit * q - discountAmount) * (rate / 100));
-                          }
-
-                          const c = clients.find(x => x.id === formData.clientId);
-                          const clientAibRate = c && c.aibRegistration ? (c.aibRate ?? 0) : 0;
-                          const override = formData.aibRateOverride ? parseAibRate(formData.aibRateOverride) : null;
-                          const aibRate = (override !== null ? override : clientAibRate) as 0 | 1 | 5;
-                          const aibAmount = Math.round(totalHT * (aibRate / 100));
-                          const tva = totalVat;
-                          const totalTTC = totalHT + tva + aibAmount;
-
-                          if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount) || !Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
-                            return <p className="text-sm text-muted-foreground">Montants invalides (vérifie prix, quantité et remise)</p>;
-                          }
-                          return (
-                            <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
-                              <div className="flex justify-between">
-                                <span>Total HT:</span>
-                                <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
-                              </div>
-                              <div className="flex justify-between text-destructive">
-                                <span>Remise totale:</span>
-                                <span className="font-medium">- {totalDiscount.toLocaleString('fr-FR')} FCFA</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>TVA:</span>
-                                <span className="font-medium">{tva.toLocaleString('fr-FR')} FCFA</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>AIB ({aibRate}%):</span>
-                                <span className="font-medium">{aibAmount.toLocaleString('fr-FR')} FCFA</span>
-                              </div>
-                              <div className="flex justify-between font-bold text-base pt-1 border-t">
-                                <span>Total TTC:</span>
-                                <span>{totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                        <div className="border-t pt-4 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-semibold">Récapitulatif</Label>
+                          </div>
+                          <div className="flex items-center justify-between rounded-md border p-3">
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium">AIB</div>
+                              <div className="text-xs text-muted-foreground">
+                                {(() => {
+                                  const c = clients.find(x => x.id === formData.clientId);
+                                  if (!c) return '—';
+                                  if (!c.aibRegistration) return 'Non assujetti (0%)';
+                                  return `Assujetti (${c.aibRate ?? 0}%)`;
+                                })()}
                               </div>
                             </div>
-                          );
-                        })()}
+                            <div className="flex items-center gap-2">
+                              <Label className="text-xs">Override</Label>
+                              <select
+                                className="rounded border px-2 py-1 text-sm"
+                                value={formData.aibRateOverride}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, aibRateOverride: e.target.value as '' | '0' | '1' | '5' }))}
+                              >
+                                <option value="">Auto</option>
+                                <option value="0">0%</option>
+                                <option value="1">1%</option>
+                                <option value="5">5%</option>
+                              </select>
+                            </div>
+                          </div>
+                          {(() => {
+                            const validItems = items.filter(it => it.productId && Number.parseInt(String(it.quantity), 10) > 0);
+                            if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
+                            let totalHT = 0;
+                            let totalDiscount = 0;
+                            let totalVat = 0;
+                            for (const it of validItems) {
+                              const prod = products.find(p => p.id === it.productId);
+                              if (!prod) continue;
+                              const q = Number.parseInt(String(it.quantity), 10);
+                              const unit = parseMoney((prod as unknown as { unitPrice?: unknown }).unitPrice);
+                              if (!Number.isFinite(q) || q <= 0) continue;
+                              if (!Number.isFinite(unit) || unit < 0) continue;
+
+                              const d = Number.parseFloat(String(it.discount || '')) || 0;
+                              let discountAmount = 0;
+                              if (d > 0) {
+                                if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
+                                else discountAmount = d * q;
+                              }
+                              totalHT += unit * q - discountAmount;
+                              totalDiscount += discountAmount;
+
+                              const g = ((prod as unknown as Product).taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
+                              const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
+                              totalVat += Math.round((unit * q - discountAmount) * (rate / 100));
+                            }
+
+                            const c = clients.find(x => x.id === formData.clientId);
+                            const clientAibRate = c && c.aibRegistration ? (c.aibRate ?? 0) : 0;
+                            const override = formData.aibRateOverride ? parseAibRate(formData.aibRateOverride) : null;
+                            const aibRate = (override !== null ? override : clientAibRate) as 0 | 1 | 5;
+                            const aibAmount = Math.round(totalHT * (aibRate / 100));
+                            const tva = totalVat;
+                            const totalTTC = totalHT + tva + aibAmount;
+
+                            if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount) || !Number.isFinite(tva) || !Number.isFinite(totalTTC)) {
+                              return <p className="text-sm text-muted-foreground">Montants invalides (vérifie prix, quantité et remise)</p>;
+                            }
+                            return (
+                              <div className="bg-muted p-3 rounded-md space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                  <span>Total HT:</span>
+                                  <span className="font-medium">{totalHT.toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                                <div className="flex justify-between text-destructive">
+                                  <span>Remise totale:</span>
+                                  <span className="font-medium">- {totalDiscount.toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>TVA:</span>
+                                  <span className="font-medium">{tva.toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>AIB ({aibRate}%):</span>
+                                  <span className="font-medium">{aibAmount.toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                                <div className="flex justify-between font-bold text-base pt-1 border-t">
+                                  <span>Total TTC:</span>
+                                  <span>{totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
-                      
-                      <div className="flex gap-2 justify-end">
+
+                      <div className="flex gap-2 justify-end pt-3 border-t">
                         <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
                         <Button type="submit" disabled={saving}>
                           {saving ? (normalizeWithEmcf ? 'Pré-validation...' : 'Enregistrement...') : (normalizeWithEmcf ? 'Pré-valider e-MCF' : 'Enregistrer')}
