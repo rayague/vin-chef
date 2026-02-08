@@ -9,12 +9,16 @@ function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(__dirname, '..', 'public', 'logo_vin.jpeg'),
+    icon: path.join(__dirname, '..', 'public', 'logo_vin.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('[main] did-fail-load', { errorCode, errorDescription, validatedURL });
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -24,8 +28,8 @@ function createWindow() {
   }
 
   // Open the DevTools if in development
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
+  if (process.env.NODE_ENV === 'development' || process.env.VIN_CHEF_DEBUG === '1') {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 }
 
@@ -483,7 +487,7 @@ app.whenReady().then(() => {
       }
       if (!user) return { success: false };
       const bcrypt = require('bcryptjs');
-      const isValid = await bcrypt.compare(password, user.password_hash);
+      const isValid = await bcrypt.compare(String(password || ''), String(user.password_hash || ''));
       console.debug('auth.login: password comparison result for', username, isValid);
       if (!isValid) return { success: false };
       // Do not send password hash to renderer

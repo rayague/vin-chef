@@ -69,31 +69,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!foundUser) {
-  logger.warn('useAuth: no local user found for', username);
+        logger.warn('useAuth: no local user found for', username);
         return false;
       }
 
-      // Normalize the returned user object (db adapter may return a lightweight UserInfo
-      // when running under Electron). We need a `passwordHash` to verify the password.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const foundUserAny = foundUser as any;
-      // Developer-friendly debug: in dev show the stored hash and attempt compare so we can see why it fails
-      if (import.meta.env.DEV) {
-  logger.debug('useAuth [DEV]: foundUser', { username: foundUserAny?.username, passwordHash: foundUserAny?.passwordHash });
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const foundUserAny = foundUser as any;
+      const hash = foundUserAny?.passwordHash ? String(foundUserAny.passwordHash) : '';
 
       let isValid = false;
       try {
-        const hash = foundUserAny?.passwordHash;
         if (hash) isValid = await bcrypt.compare(password, hash);
       } catch (err) {
-  logger.error('useAuth: bcrypt.compare threw', err);
+        logger.error('useAuth: bcrypt.compare threw', err);
       }
 
-  logger.debug('useAuth: bcrypt.compare result for', username, isValid);
       if (isValid) {
-        // Create a safe user object that matches the `User` shape expected by the app
-        const safeUser: User = { id: foundUserAny.id, username: foundUserAny.username, role: foundUserAny.role, passwordHash: foundUserAny.passwordHash || '' } as User;
+        const safeUser: User = { id: foundUser.id, username: foundUser.username, role: foundUser.role, passwordHash: hash } as User;
         setUser(safeUser);
         setCurrentUser(safeUser);
         return true;
@@ -103,15 +95,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (import.meta.env.DEV) {
         try {
           logger.debug('useAuth [DEV]: invalid password, forcing demo seed and retrying compare');
+          if (typeof db.resetDemoData === 'function') {
+            try { await db.resetDemoData(); } catch (e) { /* ignore */ }
+          }
           initializeDemoData(true);
           const retryUser = await db.getUserByUsername(username);
           if (retryUser) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const retryUserAny = retryUser as any;
-            const retryValid = retryUserAny?.passwordHash ? await bcrypt.compare(password, retryUserAny.passwordHash) : false;
-            logger.debug('useAuth [DEV]: retry bcrypt.compare result for', username, retryValid);
+            const retryHash = retryUserAny?.passwordHash ? String(retryUserAny.passwordHash) : '';
+            const retryValid = retryHash ? await bcrypt.compare(password, retryHash) : false;
             if (retryValid) {
-              const safeRetry: User = { id: retryUserAny.id, username: retryUserAny.username, role: retryUserAny.role, passwordHash: retryUserAny.passwordHash || '' } as User;
+              const safeRetry: User = { id: retryUserAny.id, username: retryUserAny.username, role: retryUserAny.role, passwordHash: retryHash } as User;
               setUser(safeRetry);
               setCurrentUser(safeRetry);
               return true;
@@ -122,10 +117,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-  logger.warn('useAuth: invalid password for', username);
+      logger.warn('useAuth: invalid password for', username);
       return false;
     } catch (error) {
-  logger.error('Login error:', error);
+      logger.error('Login error:', error);
       return false;
     }
   };
@@ -138,7 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('vinchef:auth-changed', { detail: { loggedOut: true } }));
         // Ensure UI resets; navigate to login page to avoid stale state on pages that don't consume auth context properly
-        window.location.href = '/login';
+        window.location.hash = '#/login';
       }
     } catch (e) {
       // ignore errors during logout navigation

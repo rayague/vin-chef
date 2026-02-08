@@ -26,6 +26,7 @@ const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
   const sidebarWidth = collapsed ? '5rem' : '16rem';
+  const logoSrc = `${import.meta.env.BASE_URL}logo_vin.jpeg`;
 
   if (import.meta.env.DEV) {
     // quick dev-only debug to help locate sidebar rendering issues
@@ -55,7 +56,7 @@ const Layout = () => {
       >
         <div className="p-4 border-b border-[hsl(var(--sidebar-border))]">
           <div className="flex items-center gap-3">
-            <img src="/logo_vin.jpeg" className="w-8 h-8 object-contain rounded-full" alt="Logo" />
+            <img src={logoSrc} className="w-8 h-8 object-contain rounded-full" alt="Logo" />
             <div>
               <h2 className="text-lg font-bold text-[hsl(var(--sidebar-primary))]">Cave Premium</h2>
               <p className="text-sm opacity-90">{user?.username}</p>

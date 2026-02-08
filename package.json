@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "electron:dev": "concurrently \"npm:dev\" \"wait-on http://localhost:8080 && set VITE_DEV_SERVER_URL=http://localhost:8080 && electron .\"",
     "electron:build": "vite build && electron-builder",
+    "electron:build:win": "vite build && electron-builder --win nsis",
     "electron:package": "electron-builder -mwl",
     "test": "vitest",
     "test:integration": "vitest --run --dir test/integration --environment node",
@@ -21,8 +22,12 @@
     "appId": "com.vinchef.app",
     "productName": "Vin-Chef",
     "directories": {
-      "buildResources": "build"
+      "buildResources": "build",
+      "output": "release"
     },
+    "asarUnpack": [
+      "**/*.node"
+    ],
     "files": [
       "dist/**",
       "electron/**",
@@ -30,7 +35,8 @@
       "package.json"
     ],
     "win": {
-      "icon": "build/icon.ico"
+      "target": "nsis",
+      "icon": "public/logo_vin.ico"
     },
     "mac": {
       "icon": "build/icon.icns"
@@ -69,6 +75,8 @@
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tanstack/react-query": "^5.83.0",
+    "bcryptjs": "^3.0.2",
+    "better-sqlite3": "^12.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -106,11 +114,9 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
-    "bcryptjs": "^3.0.2",
-    "better-sqlite3": "^12.4.1",
     "concurrently": "^9.2.1",
     "electron": "^38.2.1",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^26.7.0",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",

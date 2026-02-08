@@ -252,7 +252,7 @@ const Sales = () => {
       const d = Number.parseFloat(String(it.discount || '')) || 0;
       if (d > 0) {
         if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
-        else discountAmount = d * q;
+        else discountAmount = d;
       }
       const lineTotalHT = unit * q - discountAmount;
       totalHT += lineTotalHT;
@@ -314,7 +314,7 @@ const Sales = () => {
           let netUnit = unit;
           if (d > 0) {
             if (it.discountType === 'percentage') netUnit = unit * (1 - d / 100);
-            else netUnit = unit - d;
+            else netUnit = unit - (it.quantity > 0 ? d / it.quantity : d);
           }
 
           const price = Math.max(0, Math.round(netUnit));
@@ -881,7 +881,7 @@ const Sales = () => {
                               let discountAmount = 0;
                               if (d > 0) {
                                 if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
-                                else discountAmount = d * q;
+                                else discountAmount = d;
                               }
                               totalHT += unit * q - discountAmount;
                               totalDiscount += discountAmount;
