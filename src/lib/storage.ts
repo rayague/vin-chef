@@ -102,6 +102,9 @@ const STORAGE_KEYS = {
   STOCK_MOVEMENTS: 'winecellar_stock_movements',
 };
 
+const WINE_CATALOG_SEED_VERSION = '2026-02-13-wine-catalog-v1';
+const SEED_KEY_PRODUCTS_VERSION = 'winecellar_seed_products_version';
+
 // Generic storage functions
 export const storage = {
   get: <T>(key: string): T[] => {
@@ -215,6 +218,58 @@ export const getNextInvoiceNumber = (): string => {
   return `FAC-${new Date().getFullYear()}-${String(nextCounter).padStart(5, '0')}`;
 };
 
+export const seedWineCatalog = () => {
+  try {
+    const currentVersion = localStorage.getItem(SEED_KEY_PRODUCTS_VERSION);
+    if (currentVersion === WINE_CATALOG_SEED_VERSION) return;
+
+    const nowIso = new Date().toISOString();
+
+    const catalog: Product[] = [
+      { id: 'wine-1', name: 'Chateau de Barry 13,5%', category: 'Rouges', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-2', name: 'AOC Bordeaux Superieur Chatelain des Romains', category: 'Rouges', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-3', name: 'Medoc Baron d’Antoinet 13,5%', category: 'Rouges', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-4', name: 'Saint Emilion Clos Castelot 14%', category: 'Rouges', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-5', name: 'Adegamae Pinta Negra Rouge', category: 'Rouges', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-6', name: 'Adegamae Pinta Negra Blanc', category: 'Blancs', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-7', name: 'Adegamae Pinta Negra Rosé', category: 'Rosés', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-8', name: 'Prosecco De Stefani', category: 'Blancs', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+      { id: 'wine-9', name: 'AOP Grave LA QUILLE 13,5%', category: 'Rouges', unitPrice: 0, stockQuantity: 0, description: '75cl' },
+    ];
+
+    const existing = storage.get<Product>(STORAGE_KEYS.PRODUCTS);
+    const oldDemoNames = new Set(['Château Margaux 2015', 'Meursault 1er Cru 2018', 'Champagne Dom Pérignon 2012']);
+    const cleaned = existing.filter((p) => {
+      if (!p) return false;
+      if (p.id === '1' || p.id === '2' || p.id === '3') return false;
+      if (oldDemoNames.has(String(p.name || ''))) return false;
+      return true;
+    });
+
+    const byName = new Set(cleaned.map((p) => String(p.name || '').trim().toLowerCase()));
+    for (const p of catalog) {
+      const key = String(p.name || '').trim().toLowerCase();
+      if (!byName.has(key)) cleaned.push(p);
+    }
+
+    storage.set(STORAGE_KEYS.PRODUCTS, cleaned);
+
+    const existingCats = storage.get<Category>(STORAGE_KEYS.CATEGORIES);
+    const hasRouges = existingCats.some((c) => c && c.name === 'Rouges');
+    const hasBlancs = existingCats.some((c) => c && c.name === 'Blancs');
+    const hasRoses = existingCats.some((c) => c && (c.name === 'Rosés' || c.name === 'Roses'));
+    const nextCats = [...existingCats];
+    if (!hasRouges) nextCats.push({ id: `cat-rouges-${nowIso}`, name: 'Rouges', description: 'Vins rouges' });
+    if (!hasBlancs) nextCats.push({ id: `cat-blancs-${nowIso}`, name: 'Blancs', description: 'Vins blancs' });
+    if (!hasRoses) nextCats.push({ id: `cat-roses-${nowIso}`, name: 'Rosés', description: 'Vins rosés' });
+    storage.set(STORAGE_KEYS.CATEGORIES, nextCats);
+
+    localStorage.setItem(SEED_KEY_PRODUCTS_VERSION, WINE_CATALOG_SEED_VERSION);
+  } catch {
+    // ignore
+  }
+};
+
 // Initialize with demo data
 import bcrypt from 'bcryptjs';
 
@@ -236,34 +291,6 @@ export const initializeDemoData = (force: boolean = false) => {
       username: 'commercial',
       passwordHash: bcrypt.hashSync('demo123', 10),
       role: 'commercial',
-    },
-  ];
-
-  // Demo products
-  const demoProducts: Product[] = [
-    {
-      id: '1',
-      name: 'Château Margaux 2015',
-      category: 'Bordeaux Rouge',
-      unitPrice: 450000,
-      stockQuantity: 12,
-      description: 'Premier Grand Cru Classé',
-    },
-    {
-      id: '2',
-      name: 'Meursault 1er Cru 2018',
-      category: 'Bourgogne Blanc',
-      unitPrice: 280000,
-      stockQuantity: 24,
-      description: 'Vin blanc sec de Bourgogne',
-    },
-    {
-      id: '3',
-      name: 'Champagne Dom Pérignon 2012',
-      category: 'Champagne',
-      unitPrice: 650000,
-      stockQuantity: 18,
-      description: 'Champagne prestige',
     },
   ];
 
@@ -297,11 +324,13 @@ export const initializeDemoData = (force: boolean = false) => {
 
   // Save demo data
   storage.set(STORAGE_KEYS.USERS, demoUsers);
-  storage.set(STORAGE_KEYS.PRODUCTS, demoProducts);
+  storage.set(STORAGE_KEYS.PRODUCTS, []);
   storage.set(STORAGE_KEYS.CLIENTS, demoClients);
   storage.set(STORAGE_KEYS.SALES, []);
   storage.set(STORAGE_KEYS.INVOICES, []);
   storage.set(STORAGE_KEYS.CATEGORIES, demoCategories);
+
+  seedWineCatalog();
 };
 
 // Stock movements

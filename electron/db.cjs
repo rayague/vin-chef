@@ -40,6 +40,30 @@ function ensureSchema() {
     )`
   ).run();
 
+  // app meta
+  db.prepare(
+    `CREATE TABLE IF NOT EXISTS app_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )`
+  ).run();
+
+  // stock movements
+  db.prepare(
+    `CREATE TABLE IF NOT EXISTS stock_movements (
+      id TEXT PRIMARY KEY,
+      product_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      reason TEXT,
+      date TEXT NOT NULL,
+      created_by TEXT,
+      previous_stock INTEGER NOT NULL,
+      new_stock INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )`
+  ).run();
+
   // products
   db.prepare(
     `CREATE TABLE IF NOT EXISTS products (
@@ -214,13 +238,45 @@ function init(app) {
   }
 
   // Seed products if empty
-  const prodCount = db.prepare('SELECT COUNT(*) as c FROM products').get().c;
-  if (prodCount === 0) {
-    const now = new Date().toISOString();
-    const insertP = db.prepare('INSERT INTO products (id, name, category, unit_price, stock_quantity, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    insertP.run('1', 'Château Margaux 2015', 'Bordeaux Rouge', 450000, 12, 'Premier Grand Cru Classé', now);
-    insertP.run('2', 'Meursault 1er Cru 2018', 'Bourgogne Blanc', 280000, 24, 'Vin blanc sec de Bourgogne', now);
-    insertP.run('3', 'Champagne Dom Pérignon 2012', 'Champagne', 650000, 18, 'Champagne prestige', now);
+  const WINE_CATALOG_SEED_VERSION = '2026-02-13-wine-catalog-v1';
+  try {
+    const row = db.prepare('SELECT value FROM app_meta WHERE key = ?').get('products_seed_version');
+    const currentVersion = row ? String(row.value || '') : '';
+    if (currentVersion !== WINE_CATALOG_SEED_VERSION) {
+      const now = new Date().toISOString();
+
+      // Remove old demo entries only
+      const oldNames = ['Château Margaux 2015', 'Meursault 1er Cru 2018', 'Champagne Dom Pérignon 2012'];
+      db.prepare("DELETE FROM products WHERE id IN ('1','2','3')").run();
+      db.prepare(`DELETE FROM products WHERE name IN (${oldNames.map(() => '?').join(',')})`).run(...oldNames);
+
+      const catalog = [
+        { id: 'wine-1', name: 'Chateau de Barry 13,5%', category: 'Rouges', description: '75cl' },
+        { id: 'wine-2', name: 'AOC Bordeaux Superieur Chatelain des Romains', category: 'Rouges', description: '75cl' },
+        { id: 'wine-3', name: 'Medoc Baron d’Antoinet 13,5%', category: 'Rouges', description: '75cl' },
+        { id: 'wine-4', name: 'Saint Emilion Clos Castelot 14%', category: 'Rouges', description: '75cl' },
+        { id: 'wine-5', name: 'Adegamae Pinta Negra Rouge', category: 'Rouges', description: '75cl' },
+        { id: 'wine-6', name: 'Adegamae Pinta Negra Blanc', category: 'Blancs', description: '75cl' },
+        { id: 'wine-7', name: 'Adegamae Pinta Negra Rosé', category: 'Rosés', description: '75cl' },
+        { id: 'wine-8', name: 'Prosecco De Stefani', category: 'Blancs', description: '75cl' },
+        { id: 'wine-9', name: 'AOP Grave LA QUILLE 13,5%', category: 'Rouges', description: '75cl' },
+      ];
+
+      const insertP = db.prepare(
+        'INSERT INTO products (id, name, category, unit_price, stock_quantity, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      );
+
+      for (const p of catalog) {
+        const exists = db.prepare('SELECT id FROM products WHERE id = ? OR name = ?').get(p.id, p.name);
+        if (exists) continue;
+        insertP.run(p.id, p.name, p.category || null, 0, 0, p.description || null, now);
+      }
+
+      db.prepare('INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+        .run('products_seed_version', WINE_CATALOG_SEED_VERSION);
+    }
+  } catch (e) {
+    // ignore
   }
 
   const safeJsonParse = (value) => {
@@ -289,15 +345,62 @@ function init(app) {
       if (!existing) return null;
       const updated = { ...existing, ...updates, updated_at: new Date().toISOString() };
       // accept either naming style for unit price / stock quantity
-      const unitPrice = updated.unit_price ?? updated.unitPrice;
-      const stockQuantity = updated.stock_quantity ?? updated.stockQuantity;
-      const taxGroup = updated.tax_group ?? updated.taxGroup ?? existing.tax_group ?? 'B';
-      const tvaRate = updated.tva_rate ?? updated.tvaRate ?? existing.tva_rate ?? 18;
+      const unitPrice = (updates.unit_price ?? updates.unitPrice ?? existing.unit_price);
+      const stockQuantity = (updates.stock_quantity ?? updates.stockQuantity ?? existing.stock_quantity);
+      const taxGroup = (updates.tax_group ?? updates.taxGroup ?? existing.tax_group ?? 'B');
+      const tvaRate = (updates.tva_rate ?? updates.tvaRate ?? existing.tva_rate ?? 18);
       db.prepare('UPDATE products SET name = ?, category = ?, unit_price = ?, stock_quantity = ?, description = ?, tax_group = ?, tva_rate = ?, updated_at = ? WHERE id = ?')
         .run(updated.name, updated.category, unitPrice, stockQuantity, updated.description, taxGroup, tvaRate, updated.updated_at, id);
       return db.prepare('SELECT * FROM products WHERE id = ?').get(id);
     },
     deleteProduct: (id) => db.prepare('DELETE FROM products WHERE id = ?').run(id),
+
+    // Stock Movements
+    getStockMovements: () => {
+      const rows = db.prepare('SELECT * FROM stock_movements ORDER BY date DESC').all();
+      return rows.map((r) => ({
+        ...r,
+        productId: r.product_id,
+        createdBy: r.created_by,
+        previousStock: r.previous_stock,
+        newStock: r.new_stock,
+      }));
+    },
+    addStockMovement: (movement) => {
+      const now = new Date().toISOString();
+      const m = {
+        id: movement.id,
+        productId: movement.productId ?? movement.product_id,
+        type: movement.type,
+        quantity: movement.quantity,
+        reason: movement.reason || null,
+        date: movement.date,
+        createdBy: movement.createdBy ?? movement.created_by ?? null,
+        previousStock: movement.previousStock ?? movement.previous_stock,
+        newStock: movement.newStock ?? movement.new_stock,
+      };
+
+      const tx = db.transaction(() => {
+        db.prepare(
+          'INSERT INTO stock_movements (id, product_id, type, quantity, reason, date, created_by, previous_stock, new_stock, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(
+          m.id,
+          m.productId,
+          m.type,
+          Number(m.quantity),
+          m.reason,
+          m.date,
+          m.createdBy,
+          Number(m.previousStock),
+          Number(m.newStock),
+          now
+        );
+        db.prepare('UPDATE products SET stock_quantity = ?, updated_at = ? WHERE id = ?').run(Number(m.newStock), now, m.productId);
+      });
+
+      tx();
+      return db.prepare('SELECT * FROM stock_movements WHERE id = ?').get(m.id);
+    },
 
     // Clients
     getClients: () => db.prepare('SELECT * FROM clients').all(),
@@ -732,6 +835,7 @@ function init(app) {
       // clear tables
       db.prepare('DELETE FROM invoices').run();
       db.prepare('DELETE FROM sales').run();
+      db.prepare('DELETE FROM stock_movements').run();
       db.prepare('DELETE FROM products').run();
       db.prepare('DELETE FROM clients').run();
       db.prepare('DELETE FROM users').run();
@@ -748,11 +852,16 @@ function init(app) {
         insertUser.run(u.id, u.username, hash, u.role, now);
       }
 
-      // reseed products
       const insertP = db.prepare('INSERT INTO products (id, name, category, unit_price, stock_quantity, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      insertP.run('1', 'Château Margaux 2015', 'Bordeaux Rouge', 450000, 12, 'Premier Grand Cru Classé', now);
-      insertP.run('2', 'Meursault 1er Cru 2018', 'Bourgogne Blanc', 280000, 24, 'Vin blanc sec de Bourgogne', now);
-      insertP.run('3', 'Champagne Dom Pérignon 2012', 'Champagne', 650000, 18, 'Champagne prestige', now);
+      insertP.run('wine-1', 'Chateau de Barry 13,5%', 'Rouges', 0, 0, '75cl', now);
+      insertP.run('wine-2', 'AOC Bordeaux Superieur Chatelain des Romains', 'Rouges', 0, 0, '75cl', now);
+      insertP.run('wine-3', 'Medoc Baron d’Antoinet 13,5%', 'Rouges', 0, 0, '75cl', now);
+      insertP.run('wine-4', 'Saint Emilion Clos Castelot 14%', 'Rouges', 0, 0, '75cl', now);
+      insertP.run('wine-5', 'Adegamae Pinta Negra Rouge', 'Rouges', 0, 0, '75cl', now);
+      insertP.run('wine-6', 'Adegamae Pinta Negra Blanc', 'Blancs', 0, 0, '75cl', now);
+      insertP.run('wine-7', 'Adegamae Pinta Negra Rosé', 'Rosés', 0, 0, '75cl', now);
+      insertP.run('wine-8', 'Prosecco De Stefani', 'Blancs', 0, 0, '75cl', now);
+      insertP.run('wine-9', 'AOP Grave LA QUILLE 13,5%', 'Rouges', 0, 0, '75cl', now);
 
       // reseed clients
       const insertC = db.prepare('INSERT INTO clients (id, name, contact_info, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -760,6 +869,47 @@ function init(app) {
       insertC.run('2', 'Hôtel Royal Palace', '+229 97 00 00 02', 'achats@royalpalace.bj', '+229 97 00 00 02', 'Porto-Novo, Bénin', now);
 
       return true;
+    },
+
+    resetProductCatalog: () => {
+      const now = new Date().toISOString();
+      console.log('[resetProductCatalog] start');
+      const tx = db.transaction(() => {
+        db.prepare('DELETE FROM stock_movements').run();
+        db.prepare('DELETE FROM products').run();
+
+        const insertP = db.prepare('INSERT INTO products (id, name, category, unit_price, stock_quantity, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        insertP.run('wine-1', 'Chateau de Barry 13,5%', 'Rouges', 0, 0, '75cl', now);
+        insertP.run('wine-2', 'AOC Bordeaux Superieur Chatelain des Romains', 'Rouges', 0, 0, '75cl', now);
+        insertP.run('wine-3', 'Medoc Baron d’Antoinet 13,5%', 'Rouges', 0, 0, '75cl', now);
+        insertP.run('wine-4', 'Saint Emilion Clos Castelot 14%', 'Rouges', 0, 0, '75cl', now);
+        insertP.run('wine-5', 'Adegamae Pinta Negra Rouge', 'Rouges', 0, 0, '75cl', now);
+        insertP.run('wine-6', 'Adegamae Pinta Negra Blanc', 'Blancs', 0, 0, '75cl', now);
+        insertP.run('wine-7', 'Adegamae Pinta Negra Rosé', 'Rosés', 0, 0, '75cl', now);
+        insertP.run('wine-8', 'Prosecco De Stefani', 'Blancs', 0, 0, '75cl', now);
+        insertP.run('wine-9', 'AOP Grave LA QUILLE 13,5%', 'Rouges', 0, 0, '75cl', now);
+
+        try {
+          db.prepare('INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+            .run('products_seed_version', '2026-02-13-wine-catalog-v1');
+        } catch (e) {
+          // ignore
+        }
+      });
+
+      try {
+        tx();
+        try {
+          const c = db.prepare('SELECT COUNT(*) as c FROM products').get().c;
+          console.log('[resetProductCatalog] done, products:', c);
+        } catch (e) {
+          // ignore
+        }
+        return true;
+      } catch (e) {
+        console.error('resetProductCatalog error', e);
+        return false;
+      }
     },
     // Audit logging
     addAudit: (action, entity, entityId, userId, meta) => {

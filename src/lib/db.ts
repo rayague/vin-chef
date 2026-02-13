@@ -23,6 +23,7 @@ import {
   getInvoices as storageGetInvoices,
   getUserByUsername as storageGetUserByUsername,
   initializeDemoData,
+  seedWineCatalog,
   getNextInvoiceNumber as storageGetNextInvoiceNumber,
   addProduct as storageAddProduct,
   updateProduct as storageUpdateProduct,
@@ -135,7 +136,7 @@ export const db = {
     }
     try {
       const existing = await idb.idbGet<StorageProduct>('products', id);
-      if (!existing) return null;
+      if (!existing) throw new Error('Product not found in IndexedDB');
       const updated = { ...existing, ...updates } as StorageProduct;
       await idb.idbPut('products', updated);
       emitChange({ entity: 'products', action: 'update', id });
@@ -697,7 +698,12 @@ export const db = {
     if (isElectronDBAvailable()) {
       const api = (window as unknown as Window).electronAPI!.db as unknown as ElectronDBAPI | undefined;
       if (api && typeof api.getStockMovements === 'function') {
-        return api.getStockMovements();
+        try {
+          return await api.getStockMovements();
+        } catch (err) {
+          logger.error('Electron getStockMovements failed', err);
+          return [];
+        }
       }
     }
     try {
@@ -720,6 +726,10 @@ export const db = {
       if (api && typeof api.addStockMovement === 'function') {
         const res = await api.addStockMovement(movement);
         emitChange({ entity: 'stock_movements', action: 'add', id: movement.id });
+        // Electron persists stock_movements and updates product stock atomically in main.
+        // Emit a products change so product lists/stock panels refresh immediately.
+        console.debug('Emitting products change for productId:', movement.productId);
+        emitChange({ entity: 'products', action: 'update', id: movement.productId });
         try {
           if (typeof api.addAudit === 'function') await api.addAudit('create', 'stock_movement', movement.id, (movement as unknown as import('./storage').StockMovement).createdBy || undefined, { movement });
         } catch (err) {
@@ -763,11 +773,92 @@ export const db = {
     }
   },
 
+  async resetProductCatalog() {
+    if (isElectronDBAvailable()) {
+      const fn = (window as unknown as Window).electronAPI?.db?.resetProductCatalog;
+      if (typeof fn !== 'function') {
+        logger.error('Electron resetProductCatalog IPC is not available. Please restart the Electron app to load updated main/preload.');
+        return false;
+      }
+      const ok = await fn();
+      emitChange({ entity: 'products', action: 'reset' });
+      emitChange({ entity: 'stock_movements', action: 'reset' });
+      return !!ok;
+    }
+
+    try {
+      // Browser fallback: wipe only products and stock movements
+      try {
+        const dbi = await (async () => {
+          try {
+            // openDB is internal; use idbGetAll + delete to clear
+            const products = await idb.idbGetAll<StorageProduct>('products');
+            for (const p of products) {
+              try { await idb.idbDelete('products', p.id); } catch { /* ignore */ }
+            }
+            const moves = await idb.idbGetAll<import('./storage').StockMovement>('stock_movements');
+            for (const m of moves) {
+              try { await idb.idbDelete('stock_movements', m.id); } catch { /* ignore */ }
+            }
+            return true;
+          } catch {
+            return false;
+          }
+        })();
+        void dbi;
+      } catch {
+        // ignore
+      }
+
+      try {
+        localStorage.removeItem('winecellar_products');
+        localStorage.removeItem('winecellar_stock_movements');
+      } catch {
+        // ignore
+      }
+
+      try {
+        seedWineCatalog();
+      } catch {
+        // ignore
+      }
+
+      emitChange({ entity: 'products', action: 'reset' });
+      emitChange({ entity: 'stock_movements', action: 'reset' });
+      return true;
+    } catch (err) {
+      logger.error('db.resetProductCatalog fallback failed', err);
+      return false;
+    }
+  },
+
   // Desktop-only: backup current SQLite DB to a timestamped file, return { success, path }
   async backupDatabase() {
     if (isElectronDBAvailable()) {
       const api = (window as unknown as Window).electronAPI?.db as unknown as ElectronDBAPI | undefined;
       if (api && typeof api.backupDatabase === 'function') return api.backupDatabase();
+    }
+    return { success: false, error: 'not available' };
+  },
+
+  // Desktop-only: read-only DB info
+  async getDatabaseInfo() {
+    if (isElectronDBAvailable()) {
+      const api = (window as unknown as Window).electronAPI?.db as unknown as ElectronDBAPI | undefined;
+      if (api && typeof (api as unknown as { getDatabaseInfo?: () => Promise<unknown> }).getDatabaseInfo === 'function') {
+        return (api as unknown as { getDatabaseInfo: () => Promise<unknown> }).getDatabaseInfo();
+      }
+    }
+    return { success: false, error: 'not available' };
+  },
+
+  // Desktop-only: export current SQLite DB to a user-chosen file path
+  async exportDatabaseAs() {
+    if (isElectronDBAvailable()) {
+      const api = (window as unknown as Window).electronAPI?.db as unknown as ElectronDBAPI | undefined;
+      if (api && typeof (api as unknown as { exportDatabaseAs?: () => Promise<unknown> }).exportDatabaseAs === 'function') {
+        return (api as unknown as { exportDatabaseAs: () => Promise<unknown> }).exportDatabaseAs();
+      }
     }
     return { success: false, error: 'not available' };
   },
@@ -786,6 +877,16 @@ export const db = {
       if (api && typeof api.listBackups === 'function') return api.listBackups();
     }
     return [];
+  },
+
+  async pickRestoreFile() {
+    if (isElectronDBAvailable()) {
+      const api = (window as unknown as Window).electronAPI?.db as unknown as ElectronDBAPI | undefined;
+      if (api && typeof (api as unknown as { pickRestoreFile?: () => Promise<unknown> }).pickRestoreFile === 'function') {
+        return (api as unknown as { pickRestoreFile: () => Promise<unknown> }).pickRestoreFile();
+      }
+    }
+    return { success: false, error: 'not available' };
   },
 
   async addAudit(action: string, entity: string, entityId?: string, userId?: string, meta?: unknown) {

@@ -35,7 +35,7 @@ export interface InvoiceData {
 
 // Company info (configurable)
 const COMPANY_INFO = {
-  name: 'Cave Premium Wines',
+  name: 'Business Center Fifa',
   address: 'Avenue de la République',
   city: 'Cotonou',
   country: 'Bénin',
@@ -52,7 +52,8 @@ let cachedInvoiceLogoDataUrl: string | null | undefined;
 export const getInvoiceLogoDataUrl = async (): Promise<string | null> => {
   if (cachedInvoiceLogoDataUrl !== undefined) return cachedInvoiceLogoDataUrl;
   try {
-    const res = await fetch('/logo_vin.jpeg');
+    const logoUrl = `${import.meta.env.BASE_URL}logo_vin.jpeg`;
+    const res = await fetch(logoUrl);
     if (!res.ok) {
       cachedInvoiceLogoDataUrl = null;
       return null;

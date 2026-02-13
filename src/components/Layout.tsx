@@ -58,7 +58,7 @@ const Layout = () => {
           <div className="flex items-center gap-3">
             <img src={logoSrc} className="w-8 h-8 object-contain rounded-full" alt="Logo" />
             <div>
-              <h2 className="text-lg font-bold text-[hsl(var(--sidebar-primary))]">Cave Premium</h2>
+              <h2 className="text-lg font-bold text-[hsl(var(--sidebar-primary))]">Business Center Fifa</h2>
               <p className="text-sm opacity-90">{user?.username}</p>
             </div>
           </div>
@@ -103,8 +103,7 @@ const Layout = () => {
                 {user?.role === 'admin' && (
                   <>
                     <SidebarItem collapsed={collapsed} to="/stock" icon={<Warehouse />} label="Gestion de Stock" />
-                    {/* Backups and Audit temporarily hidden per request - uncomment to restore */}
-                    {/* <SidebarItem collapsed={collapsed} to="/backups" icon={<Layers />} label="Sauvegardes" /> */}
+                    <SidebarItem collapsed={collapsed} to="/backups" icon={<Layers />} label="Sauvegardes" />
                     {/* <SidebarItem collapsed={collapsed} to="/audits" icon={<FileText />} label="Audit" /> */}
                     <SidebarItem collapsed={collapsed} to="/emcf" icon={<Settings />} label="Paramètres e-MCF" />
                     <SidebarItem collapsed={collapsed} to="/clients" icon={<Users />} label="Utilisateurs" />

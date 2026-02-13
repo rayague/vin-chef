@@ -19,7 +19,7 @@ import PageHeader from '@/components/PageHeader';
 type User = { id: string; username: string; role: string; created_at?: string; email?: string; phone?: string };
 
 const UsersPage = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
@@ -35,6 +35,18 @@ const UsersPage = () => {
     password: '',
     role: 'commercial',
   });
+
+  useEffect(() => {
+    if (editingUser) {
+      setFormData({
+        username: editingUser.username,
+        email: editingUser.email || '',
+        phone: editingUser.phone || '',
+        password: '',
+        role: editingUser.role || 'commercial',
+      });
+    }
+  }, [editingUser]);
 
   useEffect(() => {
     if (!user) {
@@ -57,6 +69,23 @@ const UsersPage = () => {
       toast({ title: 'Erreur', description: 'Le nom d\'utilisateur est requis', variant: 'destructive' });
       return;
     }
+
+    const normalizedUsername = formData.username.trim();
+    if (!normalizedUsername) {
+      toast({ title: 'Erreur', description: 'Le nom d\'utilisateur est requis', variant: 'destructive' });
+      return;
+    }
+
+    if (!['admin', 'commercial'].includes(formData.role)) {
+      toast({ title: 'Erreur', description: 'Rôle invalide', variant: 'destructive' });
+      return;
+    }
+
+    const duplicate = users.find((u) => u.username.toLowerCase() === normalizedUsername.toLowerCase() && u.id !== editingUser?.id);
+    if (duplicate) {
+      toast({ title: 'Erreur', description: "Ce nom d'utilisateur existe déjà", variant: 'destructive' });
+      return;
+    }
     if (!editingUser && (!formData.password || formData.password.length < 6)) {
       toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 6 caractères', variant: 'destructive' });
       return;
@@ -68,7 +97,7 @@ const UsersPage = () => {
 
     const userData: User = {
       id: editingUser?.id || Date.now().toString(),
-      username: formData.username,
+      username: normalizedUsername,
       role: formData.role,
       email: formData.email,
       phone: formData.phone,
@@ -77,8 +106,19 @@ const UsersPage = () => {
     setSaving(true);
     try {
       if (editingUser) {
-        await db.updateUser(editingUser.id, { username: formData.username, password: formData.password || undefined, role: formData.role });
-        toast({ title: 'Succès', description: 'Utilisateur mis à jour' });
+        await db.updateUser(editingUser.id, { username: normalizedUsername, password: formData.password || undefined, role: formData.role });
+        toast({ title: 'Succès', description: `Utilisateur mis à jour : ${normalizedUsername}` });
+
+        // If the admin updated their own credentials, force re-login to avoid stale session state.
+        if (user && editingUser.id === user.id && (formData.username !== user.username || !!formData.password)) {
+          toast({
+            title: 'Reconnectez-vous',
+            description: 'Vos identifiants ont été modifiés. Veuillez vous reconnecter.',
+          });
+          logout();
+          navigate('/login');
+          return;
+        }
       } else {
         await db.addUser({ id: userData.id, username: userData.username, password: formData.password || 'changeme', role: userData.role });
         toast({ title: 'Succès', description: 'Utilisateur ajouté' });
@@ -98,7 +138,6 @@ const UsersPage = () => {
 
   const handleEdit = (u: User) => {
     setEditingUser(u);
-    setFormData({ username: u.username, email: u.email || '', phone: u.phone || '', password: '', role: u.role || 'commercial' });
     setIsDialogOpen(true);
   };
 
@@ -112,6 +151,10 @@ const UsersPage = () => {
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
+      if (user && deleteTarget === user.id) {
+        toast({ title: 'Erreur', description: 'Vous ne pouvez pas supprimer votre propre compte.', variant: 'destructive' });
+        return;
+      }
       await db.deleteUser(deleteTarget);
       toast({ title: 'Succès', description: 'Utilisateur supprimé' });
       loadUsers();
@@ -193,7 +236,17 @@ const UsersPage = () => {
                     Debug users
                   </Button>
                 )}
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <Dialog
+                  open={isDialogOpen}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      handleDialogClose();
+                      return;
+                    }
+                    setIsDialogOpen(true);
+                    if (!editingUser) resetForm();
+                  }}
+                >
                   {user?.role === 'admin' ? (
                     <DialogTrigger asChild>
                       <Button onClick={() => { resetForm(); setEditingUser(null); }}>
@@ -246,7 +299,15 @@ const UsersPage = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="role">Rôle</Label>
-                        <Input id="role" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })} />
+                        <select
+                          id="role"
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={formData.role}
+                          onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        >
+                          <option value="commercial">commercial</option>
+                          <option value="admin">admin</option>
+                        </select>
                       </div>
                       <div className="flex gap-2 justify-end">
                         <Button type="button" variant="outline" onClick={handleDialogClose} disabled={saving}>

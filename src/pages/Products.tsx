@@ -26,6 +26,8 @@ const Products = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [resetCatalogConfirmOpen, setResetCatalogConfirmOpen] = useState(false);
+  const [electronResetAvailable, setElectronResetAvailable] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -53,6 +55,18 @@ const Products = () => {
       return;
     }
     void loadProducts();
+
+    try {
+      const isElectron = typeof window !== 'undefined' && !!(window as unknown as Window).electronAPI?.db;
+      if (isElectron) {
+        const has = typeof (window as unknown as Window).electronAPI?.db?.resetProductCatalog === 'function';
+        setElectronResetAvailable(has);
+      } else {
+        setElectronResetAvailable(true);
+      }
+    } catch {
+      setElectronResetAvailable(true);
+    }
     (async () => {
       try {
         const cats = await db.getCategories();
@@ -216,6 +230,15 @@ const Products = () => {
                   className="w-full sm:w-64"
                 />
                 {user?.role === 'admin' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setResetCatalogConfirmOpen(true)}
+                    disabled={!electronResetAvailable}
+                  >
+                    Réinitialiser le catalogue
+                  </Button>
+                )}
+                {user?.role === 'admin' && (
                   <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button onClick={() => { resetForm(); setEditingProduct(null); }}>
@@ -319,6 +342,12 @@ const Products = () => {
             </div>
           </CardHeader>
           <CardContent>
+            {!electronResetAvailable && (
+              <div className="mb-4 rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+                Le bouton de réinitialisation n'est pas disponible dans cette session Electron.
+                Ferme complètement l'application Electron et relance-la pour charger la mise à jour.
+              </div>
+            )}
             {loadError && (
               <div className="mb-4 rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
                 {loadError}
@@ -397,6 +426,34 @@ const Products = () => {
                     toast({ title: 'Erreur', description: 'Impossible de supprimer le produit', variant: 'destructive' });
                   }
                 }}>Supprimer</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {resetCatalogConfirmOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-card p-6 rounded w-[520px]">
+              <h3 className="text-lg font-semibold mb-2">Réinitialiser le catalogue</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Cette action va supprimer tous les produits et tous les mouvements de stock, puis recréer uniquement le nouveau catalogue.
+                Cette action est irréversible.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setResetCatalogConfirmOpen(false)}>Annuler</Button>
+                <Button variant="destructive" onClick={async () => {
+                  try {
+                    const ok = await (db as unknown as { resetProductCatalog?: () => Promise<boolean> }).resetProductCatalog?.();
+                    if (!ok) throw new Error('reset failed');
+                    toast({ title: 'Succès', description: 'Catalogue réinitialisé' });
+                    setResetCatalogConfirmOpen(false);
+                    setSearchTerm('');
+                    await loadProducts();
+                  } catch (err) {
+                    logger.error('reset catalog', err);
+                    toast({ title: 'Erreur', description: 'Impossible de réinitialiser le catalogue', variant: 'destructive' });
+                  }
+                }}>Réinitialiser</Button>
               </div>
             </div>
           </div>

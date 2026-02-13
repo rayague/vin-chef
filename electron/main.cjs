@@ -5,6 +5,33 @@ const dbModule = require('./db.cjs');
 
 let dbApi;
 
+console.log('[main] boot', { file: __filename, pid: process.pid, nodeEnv: process.env.NODE_ENV, devServer: process.env.VITE_DEV_SERVER_URL });
+
+function getDbApi() {
+  if (!dbApi) dbApi = dbModule.init(app);
+  return dbApi;
+}
+
+ipcMain.handle('db.getStockMovements', async () => {
+  try {
+    const api = getDbApi();
+    return api.getStockMovements ? api.getStockMovements() : [];
+  } catch (err) {
+    console.error('db.getStockMovements error', err);
+    return [];
+  }
+});
+
+ipcMain.handle('db.addStockMovement', async (event, movement) => {
+  try {
+    const api = getDbApi();
+    return api.addStockMovement ? api.addStockMovement(movement) : null;
+  } catch (err) {
+    console.error('db.addStockMovement error', err);
+    return null;
+  }
+});
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1200,
@@ -36,6 +63,8 @@ function createWindow() {
 app.whenReady().then(() => {
   // initialize DB
   dbApi = dbModule.init(app);
+
+  console.log('[main] ready: DB initialized');
 
   const joinUrl = (baseUrl, p) => {
     const b = String(baseUrl || '').replace(/\/+$/, '');
@@ -106,6 +135,18 @@ app.whenReady().then(() => {
       return false;
     }
   });
+
+  ipcMain.handle('db.resetProductCatalog', async () => {
+    try {
+      console.log('[db.resetProductCatalog] IPC called');
+      return dbApi.resetProductCatalog ? dbApi.resetProductCatalog() : false;
+    } catch (err) {
+      console.error('db.resetProductCatalog error', err);
+      return false;
+    }
+  });
+
+  console.log('[main] IPC handlers registered');
   // Write handlers
   ipcMain.handle('db.addProduct', async (event, product) => dbApi.addProduct(product));
   ipcMain.handle('db.updateProduct', async (event, id, updates) => dbApi.updateProduct(id, updates));
@@ -175,6 +216,99 @@ app.whenReady().then(() => {
       return { success: false, error: 'backup not supported' };
     } catch (err) {
       console.error('db.backupDatabase error', err);
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // Desktop-only: read-only DB info (path/size/mtime/backups count)
+  ipcMain.handle('db.getDatabaseInfo', async () => {
+    try {
+      const fs = require('fs');
+      const userDataPath = app.getPath('userData');
+      const appDir = path.join(userDataPath, 'vin-chef');
+      const dbPath = path.join(appDir, 'data.sqlite');
+      const backupsDir = path.join(appDir, 'backups');
+
+      const exists = fs.existsSync(dbPath);
+      let sizeBytes = 0;
+      let mtimeIso = null;
+      if (exists) {
+        const st = fs.statSync(dbPath);
+        sizeBytes = Number(st.size || 0);
+        mtimeIso = st.mtime ? new Date(st.mtime).toISOString() : null;
+      }
+
+      let backupsCount = 0;
+      try {
+        if (fs.existsSync(backupsDir)) {
+          backupsCount = fs.readdirSync(backupsDir).filter((f) => String(f).endsWith('.sqlite')).length;
+        }
+      } catch (e) {
+        backupsCount = 0;
+      }
+
+      return {
+        success: true,
+        exists,
+        path: dbPath,
+        sizeBytes,
+        mtimeIso,
+        backupsCount,
+      };
+    } catch (err) {
+      console.error('db.getDatabaseInfo error', err);
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // Desktop-only: export the current SQLite DB to a chosen file path
+  ipcMain.handle('db.exportDatabaseAs', async () => {
+    try {
+      const { dialog } = require('electron');
+      const fs = require('fs');
+      const win = BrowserWindow.getAllWindows()[0] || null;
+      const userDataPath = app.getPath('userData');
+      const appDir = path.join(userDataPath, 'vin-chef');
+      const dbPath = path.join(appDir, 'data.sqlite');
+
+      const now = new Date();
+      const stamp = now.toISOString().replace(/[:.]/g, '-');
+      const res = await dialog.showSaveDialog(win, {
+        title: 'Exporter la base de données',
+        defaultPath: path.join(appDir, `vin-chef-data-${stamp}.sqlite`),
+        filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
+      });
+
+      if (res.canceled || !res.filePath) return { success: false, canceled: true };
+      if (!fs.existsSync(dbPath)) return { success: false, error: 'database not found' };
+
+      // best-effort: checkpoint WAL
+      try { if (dbApi && typeof dbApi._checkpointWal === 'function') await dbApi._checkpointWal(); } catch (e) { /* ignore */ }
+
+      try { fs.copyFileSync(dbPath, res.filePath); } catch (copyErr) {
+        return { success: false, error: String(copyErr) };
+      }
+      return { success: true, path: String(res.filePath) };
+    } catch (err) {
+      console.error('db.exportDatabaseAs error', err);
+      return { success: false, error: String(err) };
+    }
+  });
+
+  // Desktop-only: pick a .sqlite file to restore (import database)
+  ipcMain.handle('db.pickRestoreFile', async () => {
+    try {
+      const { dialog } = require('electron');
+      const win = BrowserWindow.getAllWindows()[0] || null;
+      const res = await dialog.showOpenDialog(win, {
+        title: 'Importer une base de données',
+        properties: ['openFile'],
+        filters: [{ name: 'SQLite', extensions: ['sqlite', 'db'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
+      });
+      if (res.canceled || !res.filePaths || res.filePaths.length === 0) return { success: false, canceled: true };
+      return { success: true, path: String(res.filePaths[0]) };
+    } catch (err) {
+      console.error('db.pickRestoreFile error', err);
       return { success: false, error: String(err) };
     }
   });

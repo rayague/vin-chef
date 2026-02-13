@@ -53,18 +53,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Use the adapter to look up the user. This ensures we consult Electron IPC or IndexedDB fallback.
       let foundUser = await db.getUserByUsername(username);
 
-      // If not found and we're in DEV, attempt to re-seed demo data once and retry (helps when dev server changed without restart)
+      // DEV-only: if no user exists at all, seed demo data to help first run.
+      // IMPORTANT: never re-seed when users already exist, otherwise it can overwrite credentials.
       if (!foundUser && import.meta.env.DEV) {
         try {
-          logger.debug('useAuth [DEV]: user not found via db, forcing demo seed and retrying');
-          // Prefer the db reset which handles IndexedDB + storage fallback
-          if (typeof db.resetDemoData === 'function') {
-            try { await db.resetDemoData(); } catch (e) { /* ignore */ }
+          const existingUsers = await db.getUsers();
+          const hasAnyUser = Array.isArray(existingUsers) && existingUsers.length > 0;
+          if (!hasAnyUser) {
+            logger.debug('useAuth [DEV]: no users found, seeding demo data');
+            // Prefer the db reset which handles IndexedDB + storage fallback
+            if (typeof db.resetDemoData === 'function') {
+              try { await db.resetDemoData(); } catch (e) { /* ignore */ }
+            }
+            initializeDemoData(true);
+            foundUser = await db.getUserByUsername(username);
           }
-          initializeDemoData(true);
-          foundUser = await db.getUserByUsername(username);
         } catch (err) {
-          logger.error('useAuth [DEV]: initializeDemoData failed', err);
+          logger.error('useAuth [DEV]: demo seed check failed', err);
         }
       }
 
@@ -89,32 +94,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(safeUser);
         setCurrentUser(safeUser);
         return true;
-      }
-
-      // If invalid in DEV, try one more time after forcing demo seed (covers situation where hashes were missing)
-      if (import.meta.env.DEV) {
-        try {
-          logger.debug('useAuth [DEV]: invalid password, forcing demo seed and retrying compare');
-          if (typeof db.resetDemoData === 'function') {
-            try { await db.resetDemoData(); } catch (e) { /* ignore */ }
-          }
-          initializeDemoData(true);
-          const retryUser = await db.getUserByUsername(username);
-          if (retryUser) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const retryUserAny = retryUser as any;
-            const retryHash = retryUserAny?.passwordHash ? String(retryUserAny.passwordHash) : '';
-            const retryValid = retryHash ? await bcrypt.compare(password, retryHash) : false;
-            if (retryValid) {
-              const safeRetry: User = { id: retryUserAny.id, username: retryUserAny.username, role: retryUserAny.role, passwordHash: retryHash } as User;
-              setUser(safeRetry);
-              setCurrentUser(safeRetry);
-              return true;
-            }
-          }
-        } catch (err) {
-          logger.error('useAuth [DEV]: retry after seed failed', err);
-        }
       }
 
       logger.warn('useAuth: invalid password for', username);

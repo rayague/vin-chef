@@ -59,11 +59,15 @@ const StockManagement = () => {
           name?: unknown;
           category?: unknown;
           unitPrice?: unknown;
+          unit_price?: unknown;
           stockQuantity?: unknown;
+          stock_quantity?: unknown;
           description?: unknown;
         };
-        const unitPrice = Number(anyP.unitPrice);
-        const stockQuantity = Number.parseInt(String(anyP.stockQuantity ?? ''), 10);
+        const unitPriceRaw = anyP.unitPrice ?? anyP.unit_price;
+        const stockQuantityRaw = anyP.stockQuantity ?? anyP.stock_quantity;
+        const unitPrice = Number(unitPriceRaw);
+        const stockQuantity = Number.parseInt(String(stockQuantityRaw ?? ''), 10);
         return {
           ...prod,
           name: String(anyP.name ?? ''),
@@ -108,6 +112,7 @@ const StockManagement = () => {
         // ignore
       }
     };
+
     window.addEventListener('vinchef:data-changed', handler as EventListener);
     return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate, loadData, toast]);
@@ -166,7 +171,11 @@ const StockManagement = () => {
     setSaving(true);
     try {
       await db.addStockMovement(movementData);
-      await db.updateProduct(product.id, { stockQuantity: newStock });
+      // In Electron, addStockMovement already updates product stock atomically.
+      // In browser fallback, we still need to update the product stock separately.
+      if (typeof window !== 'undefined' && !window.electronAPI?.db?.addStockMovement) {
+        await db.updateProduct(product.id, { stockQuantity: newStock });
+      }
       toast({ title: 'Succès', description: 'Mouvement de stock enregistré' });
       setIsDialogOpen(false);
       resetForm();

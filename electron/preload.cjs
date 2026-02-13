@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getUserByUsername: (username) => ipcRenderer.invoke('db.getUserByUsername', username),
     getNextInvoiceNumber: () => ipcRenderer.invoke('db.getNextInvoiceNumber'),
     resetDemoData: () => ipcRenderer.invoke('db.resetDemoData'),
+    resetProductCatalog: () => ipcRenderer.invoke('db.resetProductCatalog'),
     // Write operations
     addProduct: (product) => ipcRenderer.invoke('db.addProduct', product),
     updateProduct: (id, updates) => ipcRenderer.invoke('db.updateProduct', id, updates),
@@ -26,7 +27,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteCategory: (id) => ipcRenderer.invoke('db.deleteCategory', id),
     // Backup / Restore
     backupDatabase: () => ipcRenderer.invoke('db.backupDatabase'),
+    getDatabaseInfo: () => ipcRenderer.invoke('db.getDatabaseInfo'),
+    exportDatabaseAs: () => ipcRenderer.invoke('db.exportDatabaseAs'),
     restoreDatabase: (backupPath) => ipcRenderer.invoke('db.restoreDatabase', backupPath),
+    pickRestoreFile: () => ipcRenderer.invoke('db.pickRestoreFile'),
   listBackups: () => ipcRenderer.invoke('db.listBackups'),
     listAudits: () => ipcRenderer.invoke('db.listAudits'),
   addAudit: (action, entity, entityId, userId, meta) => ipcRenderer.invoke('db.addAudit', action, entity, entityId, userId, meta),
@@ -38,6 +42,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // invoices
     updateInvoice: (id, updates) => ipcRenderer.invoke('db.updateInvoice', id, updates),
     deleteInvoice: (id) => ipcRenderer.invoke('db.deleteInvoice', id),
+    // Stock movements
+    getStockMovements: () => ipcRenderer.invoke('db.getStockMovements'),
+    addStockMovement: (movement) => ipcRenderer.invoke('db.addStockMovement', movement),
   },
   emcf: {
     listPointsOfSale: () => ipcRenderer.invoke('emcf.listPointsOfSale'),

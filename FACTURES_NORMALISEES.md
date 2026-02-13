@@ -10,7 +10,7 @@ Ce document décrit les exigences légales pour l'émission de factures conforme
 
 ### 1. **Informations du fournisseur (émetteur)**
 
-- ✅ **Raison sociale** : Cave Premium Wines
+- ✅ **Raison sociale** : Business Center Fifa
 - ✅ **Adresse complète** : Avenue de la République, Cotonou, Bénin
 - ✅ **Téléphone** : +229 21 00 00 00
 - ✅ **Email** : contact@cavepremium.bj
@@ -199,4 +199,4 @@ Pour toute question sur la conformité légale des factures, consulter :
 
 **Document mis à jour le** : 20 octobre 2025  
 **Version** : 1.0  
-**Application** : Cave Premium Wines - Système de gestion de stock et facturation
+**Application** : Business Center Fifa - Système de gestion de stock et facturation

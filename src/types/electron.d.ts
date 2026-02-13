@@ -21,6 +21,7 @@ declare global {
     getNextInvoiceNumber: () => Promise<string>;
     // Optional helper exposed by preload/main to reset demo data (desktop only)
     resetDemoData?: () => Promise<boolean>;
+    resetProductCatalog?: () => Promise<boolean>;
     // Optional CRUD methods (desktop main may expose these)
     addProduct?: (...args: unknown[]) => Promise<unknown>;
     updateProduct?: (...args: unknown[]) => Promise<void>;
@@ -37,6 +38,8 @@ declare global {
   deleteCategory?: (...args: unknown[]) => Promise<void>;
   // Backup and restore (desktop-only)
   backupDatabase?: () => Promise<{ success: boolean; path?: string; error?: string }>;
+  getDatabaseInfo?: () => Promise<{ success: boolean; exists?: boolean; path?: string; sizeBytes?: number; mtimeIso?: string | null; backupsCount?: number; error?: string }>;
+  exportDatabaseAs?: () => Promise<{ success: boolean; path?: string; canceled?: boolean; error?: string }>;
   restoreDatabase?: (backupPath: string) => Promise<{ success: boolean; error?: string }>;
   // List backups and audit logging
   listBackups?: () => Promise<unknown[]>;
@@ -53,7 +56,7 @@ declare global {
   deleteInvoice?: (...args: unknown[]) => Promise<unknown>;
   // Stock movements
   getStockMovements?: () => Promise<unknown[]>;
-  addStockMovement?: (...args: unknown[]) => Promise<unknown>;
+  addStockMovement?: (movement: { id: string; productId: string; type: string; quantity: number; reason?: string; date: string; createdBy?: string; previousStock: number; newStock: number }) => Promise<unknown>;
   }
 
   interface ElectronAuthAPI {
