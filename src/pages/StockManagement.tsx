@@ -344,7 +344,14 @@ const StockManagement = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map(product => (
+                {[...products]
+                  .sort((a, b) => {
+                    const ai = Number(a.id);
+                    const bi = Number(b.id);
+                    if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                    return String(b.id || '').localeCompare(String(a.id || ''));
+                  })
+                  .map(product => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.category}</TableCell>
@@ -406,7 +413,14 @@ const StockManagement = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les produits</SelectItem>
-                  {products.map(product => (
+                  {[...products]
+                    .sort((a, b) => {
+                      const ai = Number(a.id);
+                      const bi = Number(b.id);
+                      if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                      return String(b.id || '').localeCompare(String(a.id || ''));
+                    })
+                    .map(product => (
                     <SelectItem key={product.id} value={product.id}>{product.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -459,7 +473,14 @@ const StockManagement = () => {
                         <SelectValue placeholder="Sélectionner un produit" />
                       </SelectTrigger>
                       <SelectContent>
-                        {products.map(product => (
+                        {[...products]
+                          .sort((a, b) => {
+                            const ai = Number(a.id);
+                            const bi = Number(b.id);
+                            if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                            return String(b.id || '').localeCompare(String(a.id || ''));
+                          })
+                          .map(product => (
                           <SelectItem key={product.id} value={product.id}>
                             {product.name} (Stock actuel: {product.stockQuantity})
                           </SelectItem>

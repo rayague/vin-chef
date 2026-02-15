@@ -69,8 +69,18 @@ const Invoices = () => {
     return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, [user, navigate, loadInvoices]);
 
+  const sortedInvoices = [...invoices].sort((a, b) => {
+    const at = new Date(a.date).getTime();
+    const bt = new Date(b.date).getTime();
+    if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
+    const ai = Number(a.id);
+    const bi = Number(b.id);
+    if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+    return String(b.id || '').localeCompare(String(a.id || ''));
+  });
+
   // Derived filtered + paginated data
-  const filtered = invoices.filter(inv => {
+  const filtered = sortedInvoices.filter(inv => {
     // Date filter
     const invDate = new Date(inv.date);
     if (fromDate) {
@@ -136,6 +146,7 @@ const Invoices = () => {
       clientAddress: anyInv.clientAddress || '',
       clientPhone: anyInv.clientPhone || '',
       clientIFU: anyInv.clientIFU || undefined,
+      aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
       tvaRate: anyInv.tvaRate || undefined,
       items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
       productName: invoice.productName,
@@ -191,6 +202,7 @@ const Invoices = () => {
       clientAddress: anyInv.clientAddress || '',
       clientPhone: anyInv.clientPhone || '',
       clientIFU: anyInv.clientIFU || undefined,
+      aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
       tvaRate: anyInv.tvaRate || undefined,
       items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
       productName: invoice.productName,

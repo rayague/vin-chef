@@ -203,12 +203,19 @@ const Products = () => {
     resetForm();
   };
 
-  const filteredProducts = products.filter(product => {
-    const name = String((product as unknown as { name?: unknown }).name ?? '').toLowerCase();
-    const category = String((product as unknown as { category?: unknown }).category ?? '').toLowerCase();
-    const q = searchTerm.toLowerCase();
-    return name.includes(q) || category.includes(q);
-  });
+  const filteredProducts = [...products]
+    .filter(product => {
+      const name = String((product as unknown as { name?: unknown }).name ?? '').toLowerCase();
+      const category = String((product as unknown as { category?: unknown }).category ?? '').toLowerCase();
+      const q = searchTerm.toLowerCase();
+      return name.includes(q) || category.includes(q);
+    })
+    .sort((a, b) => {
+      const ai = Number(a.id);
+      const bi = Number(b.id);
+      if (Number.isFinite(ai) && Number.isFinite(bi)) return bi - ai;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
   return (
     <PageContainer>
@@ -271,7 +278,14 @@ const Products = () => {
                                     // Avoid empty string value: Radix Select requires non-empty values.
                                     <SelectItem value="__none" disabled>Aucune catégorie</SelectItem>
                                   ) : (
-                                    categories.map(cat => (
+                                    [...categories]
+                                      .sort((a, b) => {
+                                        const ai = Number(a.id);
+                                        const bi = Number(b.id);
+                                        if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                                        return String(b.id || '').localeCompare(String(a.id || ''));
+                                      })
+                                      .map(cat => (
                                       <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                                     ))
                                   )}

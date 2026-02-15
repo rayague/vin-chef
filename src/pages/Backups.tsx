@@ -248,7 +248,7 @@ const BackupsPage: React.FC = () => {
       {loading && <p>Chargement...</p>}
       {!loading && backups.length === 0 && <p>Aucune sauvegarde disponible.</p>}
       <div className="space-y-2">
-        {backups.map((b) => (
+        {[...backups].sort((a, b) => String(b).localeCompare(String(a))).map((b) => (
           <div key={b} className="flex items-center justify-between p-3 border rounded">
             <div className="truncate mr-4">{b}</div>
             <div className="flex items-center gap-2">

@@ -11,6 +11,7 @@ export interface InvoiceData {
   clientAddress?: string;
   clientPhone?: string;
   clientIFU?: string;
+  aibRate?: 0 | 1 | 5;
   logoDataUrl?: string;
   emcfCodeMECeFDGI?: string;
   emcfQrCode?: string;
@@ -23,7 +24,7 @@ export interface InvoiceData {
   quantity?: number;
   unitPrice?: number; // prix unitaire HT
   // Multi-item support
-  items?: { description: string; quantity: number; unitPrice: number; discount?: number }[];
+  items?: { description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }[];
   tvaRate?: number; // ex: 18 for 18%
   totalHT: number;
   tva: number;
@@ -35,7 +36,7 @@ export interface InvoiceData {
 
 // Company info (configurable)
 const COMPANY_INFO = {
-  name: 'Business Center Fifa',
+  name: 'Business Fifa Center',
   address: 'Avenue de la République',
   city: 'Cotonou',
   country: 'Bénin',
@@ -227,6 +228,11 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     clientY += 5;
   }
 
+  if (data.aibRate !== undefined && data.aibRate !== null) {
+    doc.text(`AIB: ${String(data.aibRate)}%`, 15, clientY);
+    clientY += 5;
+  }
+
   // Table header and rows
   const tableStartY = Math.max(clientY + 6, clientStartY + 26);
 
@@ -237,7 +243,17 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   if (data.items && data.items.length > 0) {
     data.items.forEach(item => {
       const lineTotal = item.unitPrice * item.quantity - (item.discount || 0);
-      rows.push([item.description, String(item.quantity), formatCurrency(item.unitPrice), formatCurrency(lineTotal), `${tvaRate}%`, formatCurrency((lineTotal * tvaRate) / 100)]);
+      const tg = item.taxGroup ? String(item.taxGroup).toUpperCase() : '';
+      const tgLabel = tg === 'A' || tg === 'E' ? 'EXO' : tg;
+      const st = (item.specificTax !== undefined && item.specificTax !== null) ? Number(item.specificTax) : 0;
+      rows.push([
+        item.description,
+        String(item.quantity),
+        formatCurrency(item.unitPrice),
+        formatCurrency(lineTotal),
+        tgLabel || '—',
+        st > 0 ? formatCurrency(st) : '—',
+      ]);
     });
   } else {
     rows.push([
@@ -257,8 +273,8 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       { content: 'Qté', styles: { halign: 'center' } },
       { content: 'P.U. HT (FCFA)', styles: { halign: 'right' } },
       { content: 'Total HT (FCFA)', styles: { halign: 'right' } },
-      { content: 'TVA %', styles: { halign: 'right' } },
-      { content: 'Montant TVA (FCFA)', styles: { halign: 'right' } },
+      { content: (data.items && data.items.length > 0) ? 'Taxe' : 'TVA %', styles: { halign: 'right' } },
+      { content: (data.items && data.items.length > 0) ? 'Taxe spéc.' : 'Montant TVA (FCFA)', styles: { halign: 'right' } },
     ]],
     body: rows,
     theme: 'grid',
@@ -269,8 +285,8 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       1: { cellWidth: 15 },
       2: { cellWidth: 28 },
       3: { cellWidth: 28 },
-      4: { cellWidth: 15 },
-      5: { cellWidth: 30 },
+      4: { cellWidth: 18 },
+      5: { cellWidth: 27 },
     },
   });
 

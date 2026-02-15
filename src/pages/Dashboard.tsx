@@ -103,7 +103,7 @@ const Dashboard = () => {
           <div className="flex items-center gap-3">
             <img src="/logo_vin.jpeg" className="w-10 h-10 object-contain rounded-full" alt="Logo" />
             <div>
-              <h1 className="text-2xl font-bold">Business Center Fifa</h1>
+              <h1 className="text-2xl font-bold">Business Fifa Center</h1>
               <p className="text-muted-foreground">Gestion de cave à vin</p>
             </div>
           </div>

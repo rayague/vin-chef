@@ -8,9 +8,10 @@ import SecurityBadge from '@/components/SecurityBadge';
 import { Invoice } from '@/lib/storage';
 
 type InvoiceWithExtras = Invoice & {
-  items?: Array<{ description?: string; name?: string; quantity: number; unitPrice: number; discount?: number }>;
+  items?: Array<{ description?: string; name?: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
   clientAddress?: string;
   clientPhone?: string;
+  aibRate?: 0 | 1 | 5;
 };
 
 export interface InvoiceDetailsModalProps {
@@ -65,6 +66,10 @@ export default function InvoiceDetailsModal({ open, onOpenChange, invoice, onPre
               <div className="text-muted-foreground">{invoice.clientName}</div>
               {invoice.clientIFU ? <div className="text-muted-foreground">IFU: {invoice.clientIFU}</div> : null}
               {(invoice as InvoiceWithExtras).clientPhone ? <div className="text-muted-foreground">Tél: {(invoice as InvoiceWithExtras).clientPhone}</div> : null}
+              {(invoice as InvoiceWithExtras).clientAddress ? <div className="text-muted-foreground">Adresse: {(invoice as InvoiceWithExtras).clientAddress}</div> : null}
+              {typeof (invoice as InvoiceWithExtras).aibRate === 'number' ? (
+                <div className="text-muted-foreground">AIB: {(invoice as InvoiceWithExtras).aibRate}%</div>
+              ) : null}
             </div>
           </div>
           <div>
@@ -85,6 +90,8 @@ export default function InvoiceDetailsModal({ open, onOpenChange, invoice, onPre
                 <TableRow>
                   <TableHead>Désignation</TableHead>
                   <TableHead>Qté</TableHead>
+                  <TableHead>Taxe</TableHead>
+                  <TableHead className="text-right">Taxe spéc.</TableHead>
                   <TableHead className="text-right">P.U</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
@@ -93,10 +100,15 @@ export default function InvoiceDetailsModal({ open, onOpenChange, invoice, onPre
                 {items.map((it, idx) => {
                   const desc = it.description || it.name || '-';
                   const total = (it.unitPrice || 0) * (it.quantity || 0) - (it.discount || 0);
+                  const tg = it.taxGroup ? String(it.taxGroup).toUpperCase() : '';
+                  const tgLabel = tg === 'A' || tg === 'E' ? 'EXO' : (tg || '—');
+                  const st = (it.specificTax !== undefined && it.specificTax !== null) ? Number(it.specificTax) : 0;
                   return (
                     <TableRow key={idx}>
                       <TableCell>{desc}</TableCell>
                       <TableCell>{it.quantity}</TableCell>
+                      <TableCell>{tgLabel}</TableCell>
+                      <TableCell className="text-right">{st > 0 ? `${st.toLocaleString('fr-FR')} FCFA` : '—'}</TableCell>
                       <TableCell className="text-right">{(it.unitPrice || 0).toLocaleString('fr-FR')} FCFA</TableCell>
                       <TableCell className="text-right">{total.toLocaleString('fr-FR')} FCFA</TableCell>
                     </TableRow>

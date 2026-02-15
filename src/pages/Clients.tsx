@@ -176,7 +176,17 @@ const UsersPage = () => {
     resetForm();
   };
 
-  const filtered = users.filter(u => u.username.toLowerCase().includes(searchTerm.toLowerCase()) || (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = [...users]
+    .filter(u => u.username.toLowerCase().includes(searchTerm.toLowerCase()) || (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      const at = a.created_at ? new Date(a.created_at).getTime() : NaN;
+      const bt = b.created_at ? new Date(b.created_at).getTime() : NaN;
+      if (Number.isFinite(at) && Number.isFinite(bt)) return bt - at;
+      const ai = Number(a.id);
+      const bi = Number(b.id);
+      if (Number.isFinite(ai) && Number.isFinite(bi)) return bi - ai;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
   return (
     <PageContainer>

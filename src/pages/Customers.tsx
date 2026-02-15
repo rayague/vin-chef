@@ -54,11 +54,18 @@ const Customers = () => {
     return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
   }, []);
 
-  const filtered = clients.filter(c => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return (c.name || '').toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q);
-  });
+  const filtered = [...clients]
+    .filter(c => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return (c.name || '').toLowerCase().includes(q) || (c.phone || '').toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      const ai = Number(a.id);
+      const bi = Number(b.id);
+      if (Number.isFinite(ai) && Number.isFinite(bi)) return bi - ai;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
   return (
     <PageContainer>
@@ -83,6 +90,8 @@ const Customers = () => {
                 <TableRow>
                     <TableHead>Nom</TableHead>
                     <TableHead>Téléphone</TableHead>
+                    <TableHead>IFU</TableHead>
+                    <TableHead>AIB</TableHead>
                     <TableHead>Remise</TableHead>
                     <TableHead>Actions</TableHead>
                 </TableRow>
@@ -92,6 +101,17 @@ const Customers = () => {
                   <TableRow key={c.id} className={c.id === highlightedId ? 'bg-yellow-100' : undefined}>
                     <TableCell>{c.name}</TableCell>
                     <TableCell>{c.phone || '-'}</TableCell>
+                    <TableCell>{c.ifu ? <span className="font-mono text-xs">{c.ifu}</span> : <span className="text-muted-foreground">-</span>}</TableCell>
+                    <TableCell>
+                      {c.aibRegistration ? (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">Oui</Badge>
+                          <span className="text-sm font-medium">{String(c.aibRate ?? 0)}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Non</span>
+                      )}
+                    </TableCell>
                       <TableCell>
                         {(() => {
                           if (c.discount === undefined || c.discount === null) return <span className="text-muted-foreground">-</span>;

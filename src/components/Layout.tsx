@@ -58,7 +58,7 @@ const Layout = () => {
           <div className="flex items-center gap-3">
             <img src={logoSrc} className="w-8 h-8 object-contain rounded-full" alt="Logo" />
             <div>
-              <h2 className="text-lg font-bold text-[hsl(var(--sidebar-primary))]">Business Center Fifa</h2>
+              <h2 className="text-lg font-bold text-[hsl(var(--sidebar-primary))]">Business Fifa Center</h2>
               <p className="text-sm opacity-90">{user?.username}</p>
             </div>
           </div>

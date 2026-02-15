@@ -271,7 +271,14 @@ const EmcfSettings = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pointsOfSale.map((p) => (
+                  {[...pointsOfSale]
+                    .sort((a, b) => {
+                      const ai = Number(a.id);
+                      const bi = Number(b.id);
+                      if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                      return String(b.id || '').localeCompare(String(a.id || ''));
+                    })
+                    .map((p) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.name}</TableCell>
                       <TableCell className="max-w-[380px] truncate">

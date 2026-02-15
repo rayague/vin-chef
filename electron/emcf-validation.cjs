@@ -82,6 +82,14 @@ const validateInvoicePayload = (payload) => {
         "AVOIR_REFERENCE_MANQUANTE: Pour une facture d'avoir (AV), au moins une référence (code MECeF, UID ou reference) est obligatoire"
       );
     }
+
+    const raw = safeTrim(payload.originalInvoiceReference || payload.reference || payload.originalInvoiceUid);
+    const cleaned = raw.replace(/-/g, '').replace(/[^0-9a-zA-Z]/g, '');
+    if (cleaned.length !== 24) {
+      throw new Error(
+        "AVOIR_REFERENCE_INVALIDE: La référence de la facture originale doit contenir exactement 24 caractères (code MECeF DGI). Sélectionne une facture confirmée e-MCF."
+      );
+    }
   }
 
   if (!payload.customer && !payload.client) {
@@ -107,6 +115,15 @@ const validateInvoicePayload = (payload) => {
     }
     if (unitPrice === null || unitPrice < 0) {
       throw new Error(`ARTICLE_PRIX_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - prix unitaire invalide`);
+    }
+
+    if (item?.specificTax !== undefined && item?.specificTax !== null) {
+      const st = toNumber(item.specificTax);
+      if (st === null || st < 0) {
+        throw new Error(
+          `ARTICLE_TAXE_SPECIFIQUE_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - specificTax doit être >= 0`
+        );
+      }
     }
   }
 
@@ -168,12 +185,14 @@ const normalizeItems = (payload) => {
     const taxGroup = safeTrim(item?.taxGroup).toUpperCase();
     const quantity = toNumber(item?.quantity) ?? 0;
     const unitPrice = toNumber(item?.unitPrice) ?? 0;
+    const specificTax = toNumber(item?.specificTax) ?? 0;
     const vatAmount = calculateVatForItem({ ...item, taxGroup, quantity, unitPrice });
-    const totalAmount = Math.round(quantity * unitPrice);
+    const totalAmount = Math.round(quantity * unitPrice) + Math.round(specificTax);
     return {
       name: safeTrim(item?.name || item?.description || 'Article'),
       quantity,
       unitPrice,
+      specificTax,
       taxGroup,
       vatAmount,
       totalAmount,
@@ -189,9 +208,23 @@ const formatDateTimeForEmcf = (d) => {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+const mapInvoiceTypeForApi = (type) => {
+  const t = safeTrim(type).toUpperCase();
+  // The DGI API uses FA (avoir) and distinct export codes.
+  // Keep app-facing types unchanged; map only for API submission.
+  const mapping = {
+    FV: 'FV',
+    AV: 'FA',
+    FV_EXPORT: 'FV_EXPORT',
+    AV_EXPORT: 'FA_EXPORT',
+  };
+  return Object.prototype.hasOwnProperty.call(mapping, t) ? mapping[t] : t;
+};
+
 const normalizeEmcfPayload = (payload, emcfInfo = {}) => {
   const p = isPlainObject(payload) ? payload : {};
-  const type = safeTrim(p.type || 'FV').toUpperCase();
+  const appType = safeTrim(p.type || 'FV').toUpperCase();
+  const type = mapInvoiceTypeForApi(appType);
 
   const items = normalizeItems(p);
   const subtotal = items.reduce((s, it) => s + (toNumber(it.totalAmount) ?? 0), 0);
@@ -219,11 +252,18 @@ const normalizeEmcfPayload = (payload, emcfInfo = {}) => {
     total,
   };
 
-  if (type.includes('AV')) {
-    normalized.originalInvoiceReference =
-      safeTrim(p.originalInvoiceReference) || safeTrim(p.reference) || safeTrim(p.originalInvoiceUid) || null;
-    normalized.reference = safeTrim(p.reference) || null;
-    normalized.originalInvoiceUid = safeTrim(p.originalInvoiceUid) || null;
+  if (appType.includes('AV')) {
+    const rawRef = safeTrim(p.originalInvoiceReference) || safeTrim(p.reference) || safeTrim(p.originalInvoiceUid) || '';
+
+    // DGI API requires exactly 24 characters for original invoice reference.
+    // Some deployments validate `reference` or `originalInvoiceUid` as well, so we normalize all three.
+    const cleaned = safeTrim(rawRef)
+      .replace(/-/g, '')
+      .replace(/[^0-9a-zA-Z]/g, '');
+    const normalizedRef = cleaned || null;
+    normalized.originalInvoiceReference = normalizedRef;
+    normalized.reference = normalizedRef;
+    normalized.originalInvoiceUid = normalizedRef;
   }
 
   return normalized;
@@ -231,7 +271,7 @@ const normalizeEmcfPayload = (payload, emcfInfo = {}) => {
 
 const makeSafeLogMeta = (normalizedPayload) => {
   const itemsForHash = Array.isArray(normalizedPayload?.items)
-    ? normalizedPayload.items.map((it) => ({ taxGroup: it.taxGroup, quantity: it.quantity, unitPrice: it.unitPrice }))
+    ? normalizedPayload.items.map((it) => ({ taxGroup: it.taxGroup, quantity: it.quantity, unitPrice: it.unitPrice, specificTax: it.specificTax || 0 }))
     : [];
 
   const customerForHash = normalizedPayload?.customer

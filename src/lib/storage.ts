@@ -49,6 +49,7 @@ export interface Sale {
     productId: string;
     quantity: number;
     unitPrice: number;
+    specificTax?: number; // Montant fixe ajouté à la ligne (ex: taxe spécifique / taxe de séjour)
     discount?: number; // amount
     discountType?: 'percentage' | 'fixed';
   }[];

@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+console.log('[main] boot: vin-chef electron/main.cjs loaded (emcf-uid-debug-2026-02-15)');
 
 const dbModule = require('./db.cjs');
-
 let dbApi;
 
 console.log('[main] boot', { file: __filename, pid: process.pid, nodeEnv: process.env.NODE_ENV, devServer: process.env.VITE_DEV_SERVER_URL });
@@ -477,6 +479,7 @@ app.whenReady().then(() => {
   };
 
   ipcMain.handle('emcf.submitInvoice', async (event, payload, options) => {
+    console.log('[e-MCF] emcf.submitInvoice invoked (emcf-uid-debug-2026-02-15)');
     const posId = options && options.posId ? options.posId : null;
     const creds = resolveEmcfCreds(posId);
     if (!creds || !creds.baseUrl) throw new Error('e-MCF is not configured (missing base URL)');
@@ -509,8 +512,14 @@ app.whenReady().then(() => {
         });
       }
 
+      const originalType = payload && payload.type ? String(payload.type) : undefined;
+      const avRef = normalizedPayload && normalizedPayload.originalInvoiceReference ? String(normalizedPayload.originalInvoiceReference) : undefined;
       console.log('[e-MCF] Payload validé:', {
         ...makeSafeLogMeta(normalizedPayload),
+        originalType,
+        apiType: normalizedPayload && normalizedPayload.type ? String(normalizedPayload.type) : undefined,
+        avRef,
+        avRefLen: avRef ? avRef.length : 0,
         hasNim: !!normalizedPayload.nim,
         hasIfuVendeur: !!normalizedPayload.ifuVendeur,
         dateTime: normalizedPayload.dateTime,
@@ -523,15 +532,48 @@ app.whenReady().then(() => {
 
     try {
       const result = await fetchJson({ url: invoiceBaseUrl, method: 'POST', token: creds.token, body: normalizedPayload });
-      if (!result || !result.uid) {
-        throw new Error('API_RETOUR_INVALIDE: Réponse API sans UID');
+
+      const extractUid = (r) => {
+        if (!r) return null;
+        if (typeof r === 'string') return null;
+        if (r.uid) return r.uid;
+        if (r.UID) return r.UID;
+        if (r.id) return r.id;
+        if (r.invoiceUid) return r.invoiceUid;
+        if (r.invoice_id) return r.invoice_id;
+        if (r.data && (r.data.uid || r.data.UID || r.data.id)) return r.data.uid || r.data.UID || r.data.id;
+        return null;
+      };
+
+      const uid = extractUid(result);
+      if (!uid) {
+        console.error('[e-MCF] Réponse API sans UID (debug raw response):', result);
+        const apiMsg =
+          (result && typeof result === 'object' && (result.message || result.error || result.msg))
+            ? String(result.message || result.error || result.msg)
+            : null;
+
+        let raw;
+        try {
+          raw = typeof result === 'string' ? result : JSON.stringify(result);
+        } catch {
+          raw = String(result);
+        }
+
+        throw new Error(`API_RETOUR_INVALIDE: Réponse API sans UID${apiMsg ? ` (${apiMsg})` : ''} | raw=${raw}`);
       }
+
+      if (result && typeof result === 'object' && !result.uid) {
+        result.uid = uid;
+      }
+
       return result;
     } catch (error) {
       const msg = error && error.message ? String(error.message) : 'UNKNOWN_ERROR';
       console.error('[e-MCF] Erreur soumission:', {
         error: msg,
         payloadType: normalizedPayload && normalizedPayload.type ? normalizedPayload.type : undefined,
+        originalType: payload && payload.type ? String(payload.type) : undefined,
         validation: 'FAILED',
         stack: error && error.stack ? String(error.stack) : undefined,
       });

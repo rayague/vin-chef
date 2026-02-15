@@ -101,7 +101,14 @@ const Categories = () => {
     setDeleteTarget(id);
   };
 
-  const filtered = categories.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = [...categories]
+    .filter(c => c.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const ai = Number(a.id);
+      const bi = Number(b.id);
+      if (Number.isFinite(ai) && Number.isFinite(bi)) return bi - ai;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    });
 
   return (
     <PageContainer>

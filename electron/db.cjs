@@ -435,8 +435,22 @@ function init(app) {
       if (!existing) return null;
       const updated = { ...existing, ...updates };
       const nextIfu = updated.ifu ?? existing.ifu ?? null;
-      const nextAibRegistration = (updated.aib_registration ?? (updated.aibRegistration ? 1 : 0)) ? 1 : 0;
-      const nextAibRate = updated.aib_rate ?? updated.aibRate ?? existing.aib_rate ?? 0;
+      const hasAibRegistrationUpdate =
+        updates &&
+        (Object.prototype.hasOwnProperty.call(updates, 'aib_registration') ||
+          Object.prototype.hasOwnProperty.call(updates, 'aibRegistration'));
+      const hasAibRateUpdate =
+        updates &&
+        (Object.prototype.hasOwnProperty.call(updates, 'aib_rate') || Object.prototype.hasOwnProperty.call(updates, 'aibRate'));
+
+      const nextAibRegistrationRaw = hasAibRegistrationUpdate
+        ? (updates.aib_registration ?? (updates.aibRegistration ? 1 : 0))
+        : (existing.aib_registration ?? 0);
+      const nextAibRegistration = nextAibRegistrationRaw ? 1 : 0;
+
+      const nextAibRate = hasAibRateUpdate
+        ? (updates.aib_rate ?? updates.aibRate ?? 0)
+        : (existing.aib_rate ?? 0);
       db.prepare('UPDATE clients SET name = ?, contact_info = ?, email = ?, phone = ?, address = ?, ifu = ?, aib_registration = ?, aib_rate = ? WHERE id = ?')
         .run(updated.name, updated.contact_info ?? updated.contactInfo, updated.email, updated.phone, updated.address, nextIfu, nextAibRegistration, nextAibRate, id);
       return db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
@@ -669,6 +683,10 @@ function init(app) {
               description: it?.description || it?.name || '—',
               quantity: Number(it?.quantity || 0),
               unitPrice: Number(it?.unitPrice || it?.price || 0),
+              taxGroup: it?.taxGroup || it?.tax_group,
+              specificTax: it?.specificTax !== undefined && it?.specificTax !== null
+                ? Number(it.specificTax)
+                : (it?.specific_tax !== undefined && it?.specific_tax !== null ? Number(it.specific_tax) : undefined),
               discount: it?.discount !== undefined && it?.discount !== null ? Number(it.discount) : undefined,
             }));
           } else if (productSnap && typeof productSnap === 'object') {
@@ -679,6 +697,10 @@ function init(app) {
               description: productSnap.description || productSnap.name || '—',
               quantity: Number(productSnap.quantity || 0),
               unitPrice: Number(productSnap.unitPrice || productSnap.price || 0),
+              taxGroup: productSnap.taxGroup || productSnap.tax_group,
+              specificTax: productSnap.specificTax !== undefined && productSnap.specificTax !== null
+                ? Number(productSnap.specificTax)
+                : (productSnap.specific_tax !== undefined && productSnap.specific_tax !== null ? Number(productSnap.specific_tax) : undefined),
               discount: productSnap.discount !== undefined && productSnap.discount !== null ? Number(productSnap.discount) : undefined,
             }];
           }

@@ -32,7 +32,19 @@ const AuditLogs: React.FC = () => {
       {loading && <p>Chargement...</p>}
       {!loading && rows.length === 0 && <p>Aucun log trouvé.</p>}
       <div className="space-y-2">
-        {rows.map((r) => {
+        {[...rows]
+          .sort((a, b) => {
+            const atRaw = (a as unknown as Record<string, unknown>)['created_at'] ?? (a as unknown as Record<string, unknown>)['createdAt'] ?? '';
+            const btRaw = (b as unknown as Record<string, unknown>)['created_at'] ?? (b as unknown as Record<string, unknown>)['createdAt'] ?? '';
+            const at = atRaw ? new Date(String(atRaw)).getTime() : NaN;
+            const bt = btRaw ? new Date(String(btRaw)).getTime() : NaN;
+            if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
+            const ai = Number((a as unknown as Record<string, unknown>)['id'] ?? NaN);
+            const bi = Number((b as unknown as Record<string, unknown>)['id'] ?? NaN);
+            if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+            return 0;
+          })
+          .map((r) => {
           const userId = (r as unknown as Record<string, unknown>)['user_id'] ?? (r as unknown as Record<string, unknown>)['userId'] ?? undefined;
           const user = users.find(u => u.id === userId);
           return (

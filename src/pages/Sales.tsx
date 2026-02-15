@@ -60,8 +60,8 @@ const Sales = () => {
     aibRateOverride: '' as '' | '0' | '1' | '5',
   });
 
-  const [items, setItems] = useState<Array<{ productId: string; quantity: string; discount: string; discountType: 'percentage' | 'fixed' }>>([
-    { productId: '', quantity: '1', discount: '', discountType: 'percentage' },
+  const [items, setItems] = useState<Array<{ productId: string; quantity: string; specificTax: string; discount: string; discountType: 'percentage' | 'fixed' }>>([
+    { productId: '', quantity: '1', specificTax: '', discount: '', discountType: 'percentage' },
   ]);
 
   const location = useLocation();
@@ -184,7 +184,7 @@ const Sales = () => {
     if (!client) return;
 
     // Validate items
-    const validItems = items.filter(it => it.productId && parseInt(it.quantity) > 0);
+    const validItems = items.filter(it => it.productId && Number.parseFloat(String(it.quantity)) > 0);
     if (validItems.length === 0) {
       toast({ title: 'Erreur', description: 'Veuillez ajouter au moins un produit', variant: 'destructive' });
       return;
@@ -193,7 +193,7 @@ const Sales = () => {
     // Check stock for each
     for (const it of validItems) {
       const prod = products.find(p => p.id === it.productId);
-      const q = parseInt(it.quantity);
+      const q = Number.parseFloat(String(it.quantity));
       if (!prod) {
         toast({ title: 'Erreur', description: 'Produit introuvable', variant: 'destructive' });
         return;
@@ -231,12 +231,13 @@ const Sales = () => {
     let totalHT = 0;
     let totalDiscount = 0;
     let totalVat = 0;
-    const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }> = [];
-    const normalizedItems: Array<{ productId: string; quantity: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
+    const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; taxGroup: NonNullable<Product['taxGroup']>; specificTax?: number; discount?: number }> = [];
+    const normalizedItems: Array<{ productId: string; quantity: number; specificTax?: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
     for (const it of validItems) {
       const prod = products.find(p => p.id === it.productId)!;
-      const q = Number.parseInt(String(it.quantity), 10);
+      const q = Number.parseFloat(String(it.quantity));
       const unit = parseMoney((prod as unknown as { unitPrice?: unknown }).unitPrice);
+      const specificTax = parseMoney(it.specificTax);
 
       if (!Number.isFinite(q) || q <= 0) {
         toast({ title: 'Erreur', description: 'Quantité invalide', variant: 'destructive' });
@@ -248,23 +249,30 @@ const Sales = () => {
         return;
       }
 
+      if (it.specificTax && (!Number.isFinite(specificTax) || specificTax < 0)) {
+        toast({ title: 'Erreur', description: `Taxe spécifique invalide pour ${prod.name}`, variant: 'destructive' });
+        return;
+      }
+
       let discountAmount = 0;
       const d = Number.parseFloat(String(it.discount || '')) || 0;
       if (d > 0) {
         if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
         else discountAmount = d;
       }
-      const lineTotalHT = unit * q - discountAmount;
+      const st = it.specificTax ? Math.round(specificTax) : 0;
+      const lineTotalHT = unit * q - discountAmount + st;
       totalHT += lineTotalHT;
       totalDiscount += discountAmount;
 
       const g = ((prod as unknown as Product).taxGroup || (isExport ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
       const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
-      const lineVat = Math.round(lineTotalHT * (rate / 100));
+      const vatBase = Math.max(0, (unit * q - discountAmount));
+      const lineVat = Math.round(vatBase * (rate / 100));
       totalVat += lineVat;
 
-      itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, discount: discountAmount > 0 ? discountAmount : undefined });
-      normalizedItems.push({ productId: it.productId, quantity: q, discount: d > 0 ? d : undefined, discountType: it.discountType });
+      itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, taxGroup: g, specificTax: st > 0 ? st : undefined, discount: discountAmount > 0 ? discountAmount : undefined });
+      normalizedItems.push({ productId: it.productId, quantity: q, specificTax: st > 0 ? st : undefined, discount: d > 0 ? d : undefined, discountType: it.discountType });
     }
 
     if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount)) {
@@ -319,6 +327,8 @@ const Sales = () => {
 
           const price = Math.max(0, Math.round(netUnit));
 
+          const st = Math.max(0, Math.round(Number(it.specificTax || 0)));
+
           const taxGroup = ((prod.taxGroup || (isExport ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>);
           return {
             code: prod.id,
@@ -327,10 +337,11 @@ const Sales = () => {
             price,
             quantity: it.quantity,
             taxGroup,
+            ...(st > 0 ? { specificTax: st } : {}),
           };
         });
 
-        const totalHTInt = emcfItems.reduce((s, it) => s + it.unitPrice * it.quantity, 0);
+        const totalHTInt = emcfItems.reduce((s, it) => s + (it.unitPrice * it.quantity) + (Number((it as unknown as { specificTax?: number }).specificTax || 0) || 0), 0);
         const tvaInt = emcfItems.reduce((s, it) => {
           const g = String((it as unknown as { taxGroup?: string }).taxGroup || 'B').toUpperCase() as NonNullable<Product['taxGroup']>;
           const rate = taxGroupToTvaRate(g);
@@ -387,9 +398,11 @@ const Sales = () => {
           aibAmount,
           ...(isAvoir
             ? {
-                originalInvoiceReference: code24 || originalUid || ref,
-                reference: originalUid || ref,
-                originalInvoiceUid: originalUid || ref,
+                // DGI expects the original invoice reference as the MECeF DGI code (exactly 24 chars), not the UUID uid.
+                // Keep the same value across fields to avoid API validating a different one.
+                originalInvoiceReference: code24 || ref,
+                reference: code24 || ref,
+                originalInvoiceUid: code24 || ref,
               }
             : {}),
         };
@@ -442,7 +455,7 @@ const Sales = () => {
       id: Date.now().toString(),
       productId: validItems[0].productId,
       clientId: formData.clientId,
-      quantity: validItems.reduce((s, it) => s + parseInt(it.quantity), 0),
+      quantity: validItems.reduce((s, it) => s + Number.parseFloat(String(it.quantity)), 0),
       unitPrice: validItems[0] ? (products.find(p => p.id === validItems[0].productId)?.unitPrice || 0) : 0,
       totalPrice: totalTTC,
       date: new Date().toISOString(),
@@ -450,7 +463,14 @@ const Sales = () => {
       createdBy: user?.id,
       discount: totalDiscount > 0 ? totalDiscount : undefined,
       discountType: totalDiscount > 0 ? 'fixed' : undefined,
-      items: validItems.map(it => ({ productId: it.productId, quantity: parseInt(it.quantity), unitPrice: products.find(p => p.id === it.productId)!.unitPrice, discount: parseFloat(it.discount) || undefined, discountType: it.discountType })),
+      items: validItems.map(it => ({
+        productId: it.productId,
+        quantity: Number.parseFloat(String(it.quantity)),
+        unitPrice: products.find(p => p.id === it.productId)!.unitPrice,
+        specificTax: it.specificTax ? Math.round(parseMoney(it.specificTax)) : undefined,
+        discount: parseFloat(it.discount) || undefined,
+        discountType: it.discountType,
+      })),
     } as Sale;
 
     setSaving(true);
@@ -463,6 +483,10 @@ const Sales = () => {
           invoiceNumber,
           date: saleData.date,
           clientSnapshot: JSON.stringify(client),
+          clientIFU: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
+          clientPhone: (client.phone || client.contactInfo || '') as string,
+          clientAddress: client.address || undefined,
+          aibRate,
           // for backward compatibility include single product snapshot as first product, and include items array
           productSnapshot: JSON.stringify(itemsPayload.length === 1 ? itemsPayload[0] : itemsPayload),
           totalPrice: totalTTC,
@@ -471,7 +495,6 @@ const Sales = () => {
           tvaRate: 18,
           invoiceType,
           originalInvoiceReference: isAvoir ? (formData.originalInvoiceReference || undefined) : undefined,
-          aibRate,
           paymentMethods: [{ type: 'ESPECES', amount: Math.round(totalTTC) }],
           immutableFlag: 1,
           createdBy: user?.id,
@@ -487,6 +510,8 @@ const Sales = () => {
           date: saleData.date,
           clientName: client.name,
           clientIFU: ((client as unknown) as Client & { ifu?: string }).ifu || undefined,
+          clientPhone: (client.phone || client.contactInfo || '') as string,
+          clientAddress: client.address || undefined,
           productName: itemsPayload.length === 1 ? itemsPayload[0].description : 'Multiple produits',
           quantity: saleData.quantity,
           unitPrice: saleData.unitPrice,
@@ -497,6 +522,14 @@ const Sales = () => {
           originalInvoiceReference: isAvoir ? (formData.originalInvoiceReference || undefined) : undefined,
           aibRate,
           paymentMethods: [{ type: 'ESPECES', amount: Math.round(totalTTC) }],
+          items: itemsPayload.map(it => ({
+            description: it.description,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            taxGroup: it.taxGroup,
+            specificTax: it.specificTax,
+            discount: it.discount,
+          })),
           createdBy: user?.id,
           discount: totalDiscount > 0 ? totalDiscount : undefined,
           discountType: totalDiscount > 0 ? 'fixed' : undefined,
@@ -577,6 +610,9 @@ const Sales = () => {
         invoiceNumber,
         date: nowIso,
         clientSnapshot: JSON.stringify(emcfPending.client),
+        clientIFU: ((emcfPending.client as unknown) as Client & { ifu?: string }).ifu || undefined,
+        clientPhone: ((emcfPending.client as unknown) as Client & { phone?: string; contactInfo?: string }).phone || ((emcfPending.client as unknown) as Client & { phone?: string; contactInfo?: string }).contactInfo || undefined,
+        clientAddress: ((emcfPending.client as unknown) as Client & { address?: string }).address || undefined,
         productSnapshot: JSON.stringify(emcfPending.itemsPayload.length === 1 ? emcfPending.itemsPayload[0] : emcfPending.itemsPayload),
         totalPrice: emcfPending.totals.totalTTC,
         tva: emcfPending.totals.tva,
@@ -623,7 +659,7 @@ const Sales = () => {
 
   const resetForm = () => {
     setFormData({ clientId: '', invoiceType: 'FV', originalInvoiceReference: '', aibRateOverride: '' });
-    setItems([{ productId: '', quantity: '1', discount: '', discountType: 'percentage' }]);
+    setItems([{ productId: '', quantity: '1', specificTax: '', discount: '', discountType: 'percentage' }]);
   };
 
   return (
@@ -720,25 +756,35 @@ const Sales = () => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="__none">—</SelectItem>
-                                {invoices
-                                  .filter((inv) => {
-                                    const anyInv = inv as unknown as Invoice & { emcfCodeMECeFDGI?: string; emcfUid?: string };
-                                    return Boolean(anyInv.emcfCodeMECeFDGI || anyInv.emcfUid);
-                                  })
-                                  .slice(0, 50)
-                                  .map((inv) => {
-                                    const anyInv = inv as unknown as Invoice & { emcfCodeMECeFDGI?: string; emcfUid?: string };
-                                    const label = `${inv.invoiceNumber} — ${anyInv.emcfCodeMECeFDGI || anyInv.emcfUid || ''}`;
-                                    const value = String(anyInv.emcfCodeMECeFDGI || anyInv.emcfUid || '');
+                                {(() => {
+                                  const eligible = invoices.filter((inv) => {
+                                    const anyInv = inv as unknown as Invoice & { emcfUid?: string; emcfCodeMECeFDGI?: string };
+                                    const code = String(anyInv.emcfCodeMECeFDGI || '').replace(/-/g, '').trim();
+                                    // DGI requires the original invoice reference to be exactly 24 chars.
+                                    // This corresponds to the confirmed invoice's codeMECeFDGI (not the UUID uid).
+                                    return code.length === 24;
+                                  });
+                                  if (eligible.length === 0) {
                                     return (
-                                      <SelectItem key={inv.id} value={value}>
+                                      <SelectItem value="__no_eligible" disabled>
+                                        Aucune facture confirmée e-MCF disponible (code MECeF DGI 24 caractères requis)
+                                      </SelectItem>
+                                    );
+                                  }
+                                  return eligible.slice(0, 50).map((inv) => {
+                                    const anyInv = inv as unknown as Invoice & { emcfCodeMECeFDGI?: string; emcfUid?: string };
+                                    const code = String(anyInv.emcfCodeMECeFDGI || '').replace(/-/g, '').trim();
+                                    const label = `${inv.invoiceNumber} — ${code}`;
+                                    return (
+                                      <SelectItem key={inv.id} value={code}>
                                         {label}
                                       </SelectItem>
                                     );
-                                  })}
+                                  });
+                                })()}
                               </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">On enverra plusieurs variantes de champ (Option C) pour maximiser la compatibilité API.</p>
+                            <p className="text-xs text-muted-foreground">Seules les factures confirmées via e-MCF (code MECeF DGI de 24 caractères) peuvent être référencées.</p>
                           </div>
                         ) : null}
 
@@ -751,7 +797,14 @@ const Sales = () => {
                                   <SelectValue placeholder="Sélectionner un client" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {clients.map(client => (
+                                  {[...clients]
+                                    .sort((a, b) => {
+                                      const ai = Number(a.id);
+                                      const bi = Number(b.id);
+                                      if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                                      return String(b.id || '').localeCompare(String(a.id || ''));
+                                    })
+                                    .map(client => (
                                     <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
                                   ))}
                                 </SelectContent>
@@ -793,15 +846,37 @@ const Sales = () => {
                                       <SelectValue placeholder="Sélectionner un produit" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {products.map(product => (
-                                        <SelectItem key={product.id} value={product.id}>{product.name} - Stock: {product.stockQuantity}</SelectItem>
+                                      {[...products]
+                                        .sort((a, b) => {
+                                          const ai = Number(a.id);
+                                          const bi = Number(b.id);
+                                          if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                                          return String(b.id || '').localeCompare(String(a.id || ''));
+                                        })
+                                        .map(p => (
+                                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
                                 </div>
                                 <div className="col-span-2">
+                                  <Label className="text-xs">Taxe</Label>
+                                  <div className="h-10 flex items-center rounded border px-3 text-sm text-muted-foreground">
+                                    {(() => {
+                                      const prod = products.find(p => p.id === it.productId);
+                                      const raw = (prod && (prod.taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B'))) || '';
+                                      const tg = String(raw || '').toUpperCase();
+                                      return tg === 'A' || tg === 'E' ? 'EXO' : (tg || '—');
+                                    })()}
+                                  </div>
+                                </div>
+                                <div className="col-span-2">
                                   <Label className="text-xs">Quantité</Label>
-                                  <Input type="number" min="1" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
+                                  <Input type="number" min="0" step="0.001" value={it.quantity} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, quantity: e.target.value } : p))} />
+                                </div>
+                                <div className="col-span-2">
+                                  <Label className="text-xs">Taxe spécifique</Label>
+                                  <Input type="number" min="0" step="1" value={it.specificTax} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, specificTax: e.target.value } : p))} />
                                 </div>
                                 <div className="col-span-2">
                                   <Label className="text-xs">Type Remise</Label>
@@ -811,11 +886,11 @@ const Sales = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="percentage">%</SelectItem>
-                                      <SelectItem value="fixed">FCFA</SelectItem>
+                                      <SelectItem value="fixed">Fixe</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
-                                <div className="col-span-2">
+                                <div className="col-span-1">
                                   <Label className="text-xs">Valeur Remise</Label>
                                   <Input type="number" min="0" value={it.discount} onChange={(e) => setItems(prev => prev.map((p, i) => i === idx ? { ...p, discount: e.target.value } : p))} />
                                 </div>
@@ -828,7 +903,7 @@ const Sales = () => {
                               </div>
                             ))}
                             <div>
-                              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
+                              <Button type="button" variant="outline" size="sm" onClick={() => setItems(prev => [...prev, { productId: '', quantity: '1', specificTax: '', discount: '', discountType: 'percentage' }])}>Ajouter un produit</Button>
                             </div>
                           </div>
                         </div>
@@ -837,34 +912,9 @@ const Sales = () => {
                           <div className="flex items-center gap-2">
                             <Label className="text-sm font-semibold">Récapitulatif</Label>
                           </div>
-                          <div className="flex items-center justify-between rounded-md border p-3">
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium">AIB</div>
-                              <div className="text-xs text-muted-foreground">
-                                {(() => {
-                                  const c = clients.find(x => x.id === formData.clientId);
-                                  if (!c) return '—';
-                                  if (!c.aibRegistration) return 'Non assujetti (0%)';
-                                  return `Assujetti (${c.aibRate ?? 0}%)`;
-                                })()}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Label className="text-xs">Override</Label>
-                              <select
-                                className="rounded border px-2 py-1 text-sm"
-                                value={formData.aibRateOverride}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, aibRateOverride: e.target.value as '' | '0' | '1' | '5' }))}
-                              >
-                                <option value="">Auto</option>
-                                <option value="0">0%</option>
-                                <option value="1">1%</option>
-                                <option value="5">5%</option>
-                              </select>
-                            </div>
-                          </div>
+                          {/* ... */}
                           {(() => {
-                            const validItems = items.filter(it => it.productId && Number.parseInt(String(it.quantity), 10) > 0);
+                            const validItems = items.filter(it => it.productId && Number.parseFloat(String(it.quantity)) > 0);
                             if (validItems.length === 0) return <p className="text-sm text-muted-foreground">Aucun produit sélectionné</p>;
                             let totalHT = 0;
                             let totalDiscount = 0;
@@ -872,8 +922,9 @@ const Sales = () => {
                             for (const it of validItems) {
                               const prod = products.find(p => p.id === it.productId);
                               if (!prod) continue;
-                              const q = Number.parseInt(String(it.quantity), 10);
+                              const q = Number.parseFloat(String(it.quantity));
                               const unit = parseMoney((prod as unknown as { unitPrice?: unknown }).unitPrice);
+                              const specificTax = parseMoney(it.specificTax);
                               if (!Number.isFinite(q) || q <= 0) continue;
                               if (!Number.isFinite(unit) || unit < 0) continue;
 
@@ -883,12 +934,14 @@ const Sales = () => {
                                 if (it.discountType === 'percentage') discountAmount = (unit * q * d) / 100;
                                 else discountAmount = d;
                               }
-                              totalHT += unit * q - discountAmount;
+                              const st = it.specificTax && Number.isFinite(specificTax) ? Math.round(specificTax) : 0;
+                              totalHT += unit * q - discountAmount + st;
                               totalDiscount += discountAmount;
 
                               const g = ((prod as unknown as Product).taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
                               const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
-                              totalVat += Math.round((unit * q - discountAmount) * (rate / 100));
+                              const vatBase = Math.max(0, (unit * q - discountAmount));
+                              totalVat += Math.round(vatBase * (rate / 100));
                             }
 
                             const c = clients.find(x => x.id === formData.clientId);
@@ -1012,7 +1065,17 @@ const Sales = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sales.map(sale => {
+                  {[...sales]
+                    .sort((a, b) => {
+                      const at = new Date(a.date).getTime();
+                      const bt = new Date(b.date).getTime();
+                      if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
+                      const ai = Number(a.id);
+                      const bi = Number(b.id);
+                      if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+                      return String(b.id || '').localeCompare(String(a.id || ''));
+                    })
+                    .map((sale) => {
                     const product = products.find(p => p.id === sale.productId);
                     const client = clients.find(c => c.id === sale.clientId);
                     const operator = users.find(u => u.id === (sale as unknown as Sale).createdBy);

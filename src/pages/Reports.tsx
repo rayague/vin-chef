@@ -81,7 +81,14 @@ const Reports = () => {
         <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         <select value={productFilter} onChange={(e) => setProductFilter(e.target.value)} className="border rounded px-2 py-1">
           <option value="">-- Filtrer par produit --</option>
-          {products.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+          {[...products]
+            .sort((a, b) => {
+              const ai = Number(a.id);
+              const bi = Number(b.id);
+              if (Number.isFinite(ai) && Number.isFinite(bi) && ai !== bi) return bi - ai;
+              return String(b.id || '').localeCompare(String(a.id || ''));
+            })
+            .map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
         </select>
         <Button onClick={() => { setStartDate(''); setEndDate(''); }}>Réinitialiser</Button>
         <Button onClick={() => exportCsv(filteredSales)}>Exporter CSV</Button>
