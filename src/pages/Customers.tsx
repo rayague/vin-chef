@@ -205,6 +205,9 @@ const Customers = () => {
                 </select>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Les réglages AIB du client s’appliquent uniquement aux nouvelles factures. Les factures déjà créées ne sont pas modifiées.
+            </p>
             <div className="mb-4 grid grid-cols-2 gap-2">
               <div>
                 <Label>Type de remise</Label>
