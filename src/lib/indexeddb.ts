@@ -124,6 +124,32 @@ export async function idbResetDemoData(initializeDemoData: (force?: boolean) => 
   initializeDemoData(true);
 }
 
+export async function idbResetSalesAndInvoices() {
+  try {
+    const db = await openDB();
+    for (const s of ['sales', 'invoices']) {
+      try {
+        const tx = db.transaction(s, 'readwrite');
+        const store = tx.objectStore(s);
+        store.clear();
+      } catch {
+        // ignore
+      }
+    }
+    await ensureInvoiceCounter(db);
+    try {
+      const tx = db.transaction('invoice_counter', 'readwrite');
+      const store = tx.objectStore('invoice_counter');
+      store.put({ id: 1, counter: 0 });
+    } catch {
+      // ignore
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function idbGetNextInvoiceNumber(): Promise<string> {
   try {
     const db = await openDB();

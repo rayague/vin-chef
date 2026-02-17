@@ -888,8 +888,16 @@ function init(app) {
       // reseed clients
       const insertC = db.prepare('INSERT INTO clients (id, name, contact_info, email, phone, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
       insertC.run('1', 'Restaurant Le Gourmet', '+229 97 00 00 01', 'contact@legourmet.bj', '+229 97 00 00 01', 'Cotonou, Bénin', now);
-      insertC.run('2', 'Hôtel Royal Palace', '+229 97 00 00 02', 'achats@royalpalace.bj', '+229 97 00 00 02', 'Porto-Novo, Bénin', now);
+      insertC.run('2', 'Hôtel du Lac', '+229 97 00 00 02', 'contact@hoteldulac.bj', '+229 97 00 00 02', 'Cotonou, Bénin', now);
+      insertC.run('3', 'Supermarché Premium', '+229 97 00 00 03', 'contact@premium.bj', '+229 97 00 00 03', 'Cotonou, Bénin', now);
 
+      return true;
+    },
+
+    resetSalesAndInvoices: () => {
+      db.prepare('DELETE FROM invoices').run();
+      db.prepare('DELETE FROM sales').run();
+      db.prepare('UPDATE invoice_counter SET counter = 0 WHERE id = 1').run();
       return true;
     },
 

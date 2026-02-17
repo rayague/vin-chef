@@ -219,6 +219,17 @@ export const getNextInvoiceNumber = (): string => {
   return `FAC-${new Date().getFullYear()}-${String(nextCounter).padStart(5, '0')}`;
 };
 
+export const resetSalesAndInvoices = (): boolean => {
+  try {
+    localStorage.removeItem(STORAGE_KEYS.SALES);
+    localStorage.removeItem(STORAGE_KEYS.INVOICES);
+    localStorage.setItem(STORAGE_KEYS.INVOICE_COUNTER, '0');
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const seedWineCatalog = () => {
   try {
     const currentVersion = localStorage.getItem(SEED_KEY_PRODUCTS_VERSION);

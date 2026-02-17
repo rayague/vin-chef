@@ -138,6 +138,17 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle('db.resetSalesAndInvoices', async (event, options) => {
+    try {
+      const role = options && options.role ? String(options.role) : '';
+      if (role !== 'admin') throw new Error('Forbidden');
+      return dbApi.resetSalesAndInvoices ? dbApi.resetSalesAndInvoices() : false;
+    } catch (err) {
+      console.error('db.resetSalesAndInvoices error', err);
+      throw err;
+    }
+  });
+
   ipcMain.handle('db.resetProductCatalog', async () => {
     try {
       console.log('[db.resetProductCatalog] IPC called');

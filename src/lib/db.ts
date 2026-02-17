@@ -37,6 +37,7 @@ import {
   addCategory as storageAddCategory,
   updateCategory as storageUpdateCategory,
   deleteCategory as storageDeleteCategory,
+  resetSalesAndInvoices as storageResetSalesAndInvoices,
 } from './storage';
 import * as idb from './indexeddb';
 import logger from './logger';
@@ -771,6 +772,33 @@ export const db = {
       logger.error('db.resetDemoData fallback failed', err);
       return false;
     }
+  },
+
+  async resetSalesAndInvoices(options?: { role?: string }) {
+    if (isElectronDBAvailable()) {
+      const fn = (window as unknown as Window).electronAPI?.db?.resetSalesAndInvoices;
+      if (typeof fn === 'function') {
+        const ok = await fn({ role: options?.role || '' });
+        emitChange({ entity: 'sales', action: 'reset' });
+        emitChange({ entity: 'invoices', action: 'reset' });
+        return ok;
+      }
+    }
+    try {
+      const anyIdb = idb as unknown as { idbResetSalesAndInvoices?: () => Promise<boolean> };
+      if (typeof anyIdb.idbResetSalesAndInvoices === 'function') {
+        const ok = await anyIdb.idbResetSalesAndInvoices();
+        emitChange({ entity: 'sales', action: 'reset' });
+        emitChange({ entity: 'invoices', action: 'reset' });
+        return ok;
+      }
+    } catch {
+      // ignore
+    }
+    const ok = storageResetSalesAndInvoices();
+    emitChange({ entity: 'sales', action: 'reset' });
+    emitChange({ entity: 'invoices', action: 'reset' });
+    return ok;
   },
 
   async resetProductCatalog() {

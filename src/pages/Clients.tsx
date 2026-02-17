@@ -222,6 +222,26 @@ const UsersPage = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-64"
                 />
+                {user?.role === 'admin' && (
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      try {
+                        const ok = window.confirm('Cette action supprimera TOUTES les ventes et TOUTES les factures.\n\nConfirmer ?');
+                        if (!ok) return;
+                        const typed = window.prompt('Dernière confirmation : tape RESET pour exécuter la réinitialisation.');
+                        if (typed !== 'RESET') return;
+                        await db.resetSalesAndInvoices({ role: 'admin' });
+                        toast({ title: 'Succès', description: 'Ventes et factures réinitialisées' });
+                      } catch (err) {
+                        logger.error('reset sales/invoices failed', err);
+                        toast({ title: 'Erreur', description: 'Impossible de réinitialiser ventes et factures', variant: 'destructive' });
+                      }
+                    }}
+                  >
+                    Réinitialiser ventes + factures
+                  </Button>
+                )}
                 {process.env.NODE_ENV === 'development' && (
                   <Button variant="outline" onClick={async () => {
                     try {

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getUserByUsername: (username) => ipcRenderer.invoke('db.getUserByUsername', username),
     getNextInvoiceNumber: () => ipcRenderer.invoke('db.getNextInvoiceNumber'),
     resetDemoData: () => ipcRenderer.invoke('db.resetDemoData'),
+    resetSalesAndInvoices: (options) => ipcRenderer.invoke('db.resetSalesAndInvoices', options),
     resetProductCatalog: () => ipcRenderer.invoke('db.resetProductCatalog'),
     // Write operations
     addProduct: (product) => ipcRenderer.invoke('db.addProduct', product),
