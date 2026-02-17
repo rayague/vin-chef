@@ -13,6 +13,7 @@ import { fr } from 'date-fns/locale';
 const Dashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const logoSrc = `${import.meta.env.BASE_URL}logo_vin.jpeg`;
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalSales: 0,
@@ -101,7 +102,7 @@ const Dashboard = () => {
       <div className="bg-primary text-primary-foreground shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <img src="/logo_vin.jpeg" className="w-10 h-10 object-contain rounded-full" alt="Logo" />
+            <img src={logoSrc} className="w-10 h-10 object-contain rounded-full" alt="Logo" />
             <div>
               <h1 className="text-2xl font-bold">Business Fifa Center</h1>
               <p className="text-muted-foreground">Gestion de cave à vin</p>
