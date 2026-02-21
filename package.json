@@ -1,7 +1,7 @@
 {
   "name": "vite_react_shadcn_ts",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Logiciel Desktop pour la gestion des stocks et des commandes de vin et de produits.",
   "author": "Ray Ague",
   "type": "module",
