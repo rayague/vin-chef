@@ -11,6 +11,12 @@ declare global {
     role: string;
   }
 
+  interface ElectronUpdaterAPI {
+    checkForUpdates: () => Promise<{ success: boolean; result?: unknown; error?: string }>;
+    quitAndInstall: () => Promise<{ success: boolean; error?: string }>;
+    onStatus: (cb: (payload: unknown) => void) => () => void;
+  }
+
   interface ElectronDBAPI {
     // Use `any` here to avoid tight coupling with module types in the renderer.
   getProducts: () => Promise<unknown[]>;
@@ -89,6 +95,7 @@ declare global {
 
   interface Window {
     electronAPI?: {
+      updater?: ElectronUpdaterAPI;
       db?: ElectronDBAPI;
       emcf?: ElectronEmcfAPI;
       auth?: ElectronAuthAPI;

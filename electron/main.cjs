@@ -2,10 +2,19 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+let autoUpdater = null;
+try {
+  ({ autoUpdater } = require('electron-updater'));
+} catch (e) {
+  autoUpdater = null;
+}
+
 console.log('[main] boot: vin-chef electron/main.cjs loaded (emcf-uid-debug-2026-02-15)');
 
 const dbModule = require('./db.cjs');
 let dbApi;
+
+let mainWindow = null;
 
 console.log('[main] boot', { file: __filename, pid: process.pid, nodeEnv: process.env.NODE_ENV, devServer: process.env.VITE_DEV_SERVER_URL });
 
@@ -35,7 +44,7 @@ ipcMain.handle('db.addStockMovement', async (event, movement) => {
 });
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: path.join(__dirname, '..', 'public', 'logo_vin.ico'),
@@ -59,6 +68,61 @@ function createWindow() {
   // Open the DevTools if in development
   if (process.env.NODE_ENV === 'development' || process.env.VIN_CHEF_DEBUG === '1') {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
+
+  return mainWindow;
+}
+
+function initAutoUpdater() {
+  try {
+    if (!autoUpdater) return;
+    if (!app.isPackaged) return;
+
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+
+    const sendStatus = (payload) => {
+      try {
+        const win = mainWindow || BrowserWindow.getAllWindows()[0];
+        if (!win || win.isDestroyed()) return;
+        win.webContents.send('updater:status', payload);
+      } catch {
+        // ignore
+      }
+    };
+
+    autoUpdater.on('checking-for-update', () => sendStatus({ state: 'checking-for-update' }));
+    autoUpdater.on('update-available', (info) => sendStatus({ state: 'update-available', info }));
+    autoUpdater.on('update-not-available', (info) => sendStatus({ state: 'update-not-available', info }));
+    autoUpdater.on('error', (err) => {
+      const msg = err && err.message ? String(err.message) : 'UNKNOWN_ERROR';
+      console.error('[updater] error', msg);
+      sendStatus({ state: 'error', error: msg });
+    });
+    autoUpdater.on('download-progress', (p) => sendStatus({ state: 'download-progress', progress: p }));
+    autoUpdater.on('update-downloaded', (info) => {
+      sendStatus({ state: 'update-downloaded', info });
+      try {
+        setTimeout(() => autoUpdater.quitAndInstall(true, true), 750);
+      } catch (e) {
+        console.error('[updater] quitAndInstall failed', e);
+      }
+    });
+
+    autoUpdater.checkForUpdates().catch((e) => {
+      console.error('[updater] checkForUpdates failed', e);
+    });
+
+    const intervalMs = Number(process.env.VIN_CHEF_UPDATE_INTERVAL_MS || 0);
+    if (intervalMs && intervalMs > 0) {
+      setInterval(() => {
+        autoUpdater.checkForUpdates().catch(() => {
+          // ignore
+        });
+      }, intervalMs);
+    }
+  } catch (err) {
+    console.error('[updater] initAutoUpdater failed', err);
   }
 }
 
@@ -687,6 +751,31 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  initAutoUpdater();
+
+  ipcMain.handle('updater.checkForUpdates', async () => {
+    if (!autoUpdater) return { success: false, error: 'autoUpdater not available' };
+    if (!app.isPackaged) return { success: false, error: 'updates disabled in dev' };
+    try {
+      const res = await autoUpdater.checkForUpdates();
+      return { success: true, result: res };
+    } catch (err) {
+      const msg = err && err.message ? String(err.message) : 'UNKNOWN_ERROR';
+      return { success: false, error: msg };
+    }
+  });
+
+  ipcMain.handle('updater.quitAndInstall', async () => {
+    if (!autoUpdater) return { success: false, error: 'autoUpdater not available' };
+    if (!app.isPackaged) return { success: false, error: 'updates disabled in dev' };
+    try {
+      autoUpdater.quitAndInstall(true, true);
+      return { success: true };
+    } catch (err) {
+      const msg = err && err.message ? String(err.message) : 'UNKNOWN_ERROR';
+      return { success: false, error: msg };
+    }
+  });
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

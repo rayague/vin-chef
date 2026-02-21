@@ -1,6 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('updater.checkForUpdates'),
+    quitAndInstall: () => ipcRenderer.invoke('updater.quitAndInstall'),
+    onStatus: (cb) => {
+      if (typeof cb !== 'function') return () => {};
+      const handler = (_event, payload) => cb(payload);
+      ipcRenderer.on('updater:status', handler);
+      return () => {
+        try {
+          ipcRenderer.removeListener('updater:status', handler);
+        } catch {
+          // ignore
+        }
+      };
+    },
+  },
   db: {
     getProducts: () => ipcRenderer.invoke('db.getProducts'),
     getClients: () => ipcRenderer.invoke('db.getClients'),
