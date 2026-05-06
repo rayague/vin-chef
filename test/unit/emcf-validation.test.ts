@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
 // CommonJS module under electron/
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
   validateInvoicePayload,
   normalizeEmcfPayload,
   calculateVatForItem,
   calculateAIB,
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
 } = require('../../electron/emcf-validation.cjs');
 
 describe('Validation payload e-MCF', () => {

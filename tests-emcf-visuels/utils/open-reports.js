@@ -11,7 +11,6 @@ const cmd = process.platform === 'win32'
 
 exec(cmd, (err) => {
   if (err) {
-    // eslint-disable-next-line no-console
     console.error('Impossible d\'ouvrir le dossier reports:', err);
     process.exitCode = 1;
   }

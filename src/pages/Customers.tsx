@@ -231,7 +231,7 @@ const Customers = () => {
                   return;
                 }
                 const aibRegistration = Boolean(form.aibRegistration);
-                const aibRate = aibRegistration ? parseAibRate(String(form.aibRate)) : (0 as 0);
+                const aibRate = aibRegistration ? parseAibRate(String(form.aibRate)) : 0;
                 if (isEditing && editingId) {
                   try {
                     const updated = await db.updateClient(editingId, {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -88,9 +88,9 @@ const Products = () => {
     };
     window.addEventListener('vinchef:data-changed', handler as EventListener);
     return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
-  }, [user, navigate]);
+  }, [user, navigate, loadProducts]);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoadError(null);
       const list = await db.getProducts();
@@ -130,7 +130,7 @@ const Products = () => {
       setLoadError("Impossible de charger les produits. Vérifie que la base de données Electron est disponible.");
       toast({ title: 'Erreur', description: "Impossible de charger les produits", variant: 'destructive' });
     }
-  };
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -10,7 +10,6 @@ async function run() {
   let failed = 0;
 
   for (const t of tests) {
-    // eslint-disable-next-line no-console
     console.log(`\n=== RUN ${t} ===`);
 
     await new Promise((resolve) => {
@@ -27,17 +26,14 @@ async function run() {
   }
 
   if (failed > 0) {
-    // eslint-disable-next-line no-console
     console.error(`\n${failed} test(s) en échec.`);
     process.exitCode = 1;
   } else {
-    // eslint-disable-next-line no-console
     console.log('\nTous les tests ont réussi.');
   }
 }
 
 run().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error('Runner error', err);
   process.exitCode = 1;
 });

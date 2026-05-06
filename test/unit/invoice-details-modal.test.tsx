@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import InvoiceDetailsModal from '../../src/pages/InvoiceDetailsModal';
+import { Invoice } from '../../src/lib/storage';
 
 describe('InvoiceDetailsModal Component', () => {
   it('Affiche toutes les sections (articles, totaux, sécurité)', async () => {
@@ -22,6 +23,7 @@ describe('InvoiceDetailsModal Component', () => {
           unitPrice: 1000,
           tva: 180,
           totalPrice: 1180,
+          saleId: 's1',
           items: [{ description: 'Produit', quantity: 1, unitPrice: 1000 }],
           emcfStatus: 'confirmed',
           emcfCodeMECeFDGI: 'ABCDE12345',
@@ -29,7 +31,7 @@ describe('InvoiceDetailsModal Component', () => {
           emcfNim: 'NIM001',
           emcfUid: 'UID001',
           emcfDateTime: '2026-02-08 10:00:00',
-        } as any}
+        } as Invoice}
       />
     );
 
@@ -62,8 +64,9 @@ describe('InvoiceDetailsModal Component', () => {
           unitPrice: 1000,
           tva: 0,
           totalPrice: 1000,
+          saleId: 's2',
           items: [{ description: 'Produit', quantity: 1, unitPrice: 1000 }],
-        } as any}
+        } as Invoice}
       />
     );
 
@@ -93,8 +96,9 @@ describe('InvoiceDetailsModal Component', () => {
           unitPrice: 1000,
           tva: 180,
           totalPrice: 1180,
+          saleId: 's3',
           items: [{ description: 'Produit', quantity: 1, unitPrice: 1000 }],
-        } as any}
+        } as Invoice}
         onPreview={spyPreview}
         onDownload={spyDownload}
       />
@@ -125,8 +129,9 @@ describe('InvoiceDetailsModal Component', () => {
           unitPrice: 1000,
           tva: 180,
           totalPrice: 1180,
+          saleId: 's4',
           items: [{ description: 'Produit', quantity: 1, unitPrice: 1000 }],
-        } as any}
+        } as Invoice}
       />
     );
 
@@ -151,8 +156,9 @@ describe('InvoiceDetailsModal Component', () => {
           unitPrice: 1000,
           tva: 180,
           totalPrice: 1180,
+          saleId: 's5',
           items: [{ description: 'Produit', quantity: 1, unitPrice: 1000 }],
-        } as any}
+        } as Invoice}
       />
     );
 

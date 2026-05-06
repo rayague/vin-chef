@@ -21,7 +21,7 @@ vi.mock('qrcode', () => {
 describe('SecurityBadge Component', () => {
   beforeEach(() => {
     // @ts-expect-error: test clipboard mock
-    global.navigator = global.navigator || ({} as any);
+    global.navigator = global.navigator || ({} as Navigator);
     // @ts-expect-error: test clipboard mock
     global.navigator.clipboard = { writeText: vi.fn(async () => {}) };
   });

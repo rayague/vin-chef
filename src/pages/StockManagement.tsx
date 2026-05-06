@@ -88,7 +88,7 @@ const StockManagement = () => {
       setUsers([]);
       toast({ title: 'Erreur', description: "Impossible de charger la gestion de stock", variant: 'destructive' });
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (!user) {

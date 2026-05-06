@@ -46,7 +46,7 @@ describe('Calculs fiscaux e-MECeF', () => {
     // subtotal = 10000 + 10000 + 2000 = 22000
     expect(n.subtotal).toBe(22000);
     // VAT = 1800 + 1000 + 0 = 2800
-    const totalVat = n.items.reduce((s: number, it: any) => s + (it.vatAmount || 0), 0);
+    const totalVat = n.items.reduce((s: number, it: { vatAmount?: number }) => s + (it.vatAmount || 0), 0);
     expect(totalVat).toBe(2800);
     // AIB 5% of subtotal = 1100
     expect(n.aibAmount).toBe(1100);

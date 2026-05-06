@@ -209,9 +209,7 @@ async function run() {
       screenshotsBaseRel: shotsBaseRel,
     });
 
-    // eslint-disable-next-line no-console
     console.log(`Report JSON: ${out.jsonPath}`);
-    // eslint-disable-next-line no-console
     console.log(`Report HTML: ${out.htmlPath}`);
 
     await context.close().catch(() => {});
@@ -220,7 +218,6 @@ async function run() {
 }
 
 run().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error('TEST FAILED:', err && err.message ? err.message : err);
   process.exitCode = 1;
 });
