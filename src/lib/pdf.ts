@@ -19,6 +19,8 @@ export interface InvoiceData {
   emcfDateTime?: string;
   emcfCounters?: string;
   emcfNim?: string;
+  operatorName?: string;
+  originalInvoiceReference?: string;
   // Single-product fields (kept for backward compatibility)
   productName?: string;
   quantity?: number;
@@ -45,6 +47,7 @@ const COMPANY_INFO = {
   ifu: '0202368226611',
   nim: 'TS01017752',
   rcs: 'RC/ESE/2025/0001', // Registre du Commerce et des Sociétés
+  rccm: 'RCCM RB/COT/25 B 0001', // Numéro RCCM_RB pour affichage
   tvaNumber: '0202368226611',
 };
 
@@ -121,8 +124,9 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.text(`IFU: ${COMPANY_INFO.ifu}`, companyX, 41);
   doc.text(`NIM: ${COMPANY_INFO.nim}`, companyX, 45);
   doc.text(`RCS: ${COMPANY_INFO.rcs}`, companyX, 49);
-  doc.text(`N° TVA: ${COMPANY_INFO.tvaNumber}`, companyX, 53);
-  const companyBottomY = 53;
+  doc.text(`RCCM_RB: ${COMPANY_INFO.rccm}`, companyX, 53);
+  doc.text(`N° TVA: ${COMPANY_INFO.tvaNumber}`, companyX, 57);
+  const companyBottomY = 57;
 
   // Invoice box on the right
   doc.setDrawColor(accent[0], accent[1], accent[2]);
@@ -131,7 +135,13 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primary[0], primary[1], primary[2]);
-  doc.text('FACTURE', 135, 20);
+  if (data.originalInvoiceReference) {
+    doc.text('FACTURE D\'AVOIR', 135, 18);
+    doc.setFontSize(7);
+    doc.text(`Réf. Orig: ${data.originalInvoiceReference}`, 135, 22);
+  } else {
+    doc.text('FACTURE', 135, 20);
+  }
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`N°: ${data.invoiceNumber}`, 135, 26);
@@ -247,7 +257,7 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       const tgLabel = tg === 'A' || tg === 'E' ? 'EXO' : tg;
       const st = (item.specificTax !== undefined && item.specificTax !== null) ? Number(item.specificTax) : 0;
       rows.push([
-        item.description,
+        `[${tgLabel || '-'}] ${item.description}`,
         String(item.quantity),
         formatCurrency(item.unitPrice),
         formatCurrency(lineTotal),
@@ -373,13 +383,12 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
 
       const formatted = formatMecEfCode(data.emcfCodeMECeFDGI);
       if (formatted) {
-        doc.setFont('courier', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(primary[0], primary[1], primary[2]);
-        const codeLines = doc.splitTextToSize(formatted, qrSize + 8) as string[];
-        doc.text(codeLines, qrX + qrSize / 2, qrY + qrSize + 4, { align: 'center' });
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('courier', 'bold');
         doc.setFontSize(9);
+        doc.setTextColor(primary[0], primary[1], primary[2]);
+        const codeLines = doc.splitTextToSize(formatted, qrSize + 15) as string[];
+        doc.text(codeLines, qrX + qrSize / 2, qrY + qrSize + 5, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
       }
     } catch {
       // ignore
@@ -425,9 +434,14 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.line(sigBoxX + 4, sigY + 15, sigBoxX + sigBoxW - 4, sigY + 15);
   doc.setFont('helvetica', 'bold');
   doc.text('Signature et cachet du fournisseur', sigBoxX + sigBoxW / 2, sigY + 20, { align: 'center' });
+  if (data.operatorName) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Opérateur: ${data.operatorName}`, sigBoxX + sigBoxW / 2, sigY + 24, { align: 'center' });
+  }
   doc.setDrawColor(accent[0], accent[1], accent[2]);
   doc.setLineWidth(0.3);
-  doc.rect(sigBoxX + 4, sigY + 22, sigBoxW - 8, sigBoxH - 26); // signature box
+  doc.rect(sigBoxX + 4, sigY + 26, sigBoxW - 8, sigBoxH - 30); // signature box
 
   // Legal footer with OHADA compliance
   const pageHeight = (doc as unknown as { internal: { pageSize: { getHeight: () => number } } }).internal.pageSize.getHeight();

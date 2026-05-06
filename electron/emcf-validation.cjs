@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 
-const ALLOWED_TAX_GROUPS = new Set(['A', 'B', 'C', 'D', 'E', 'EXPORT']);
+const ALLOWED_TAX_GROUPS = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'EXPORT']);
 const ALLOWED_AIB_RATES = new Set([0, 1, 5]);
 
 const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -41,6 +41,7 @@ const calcVatRateForTaxGroup = (taxGroup) => {
     C: 10,
     D: 5,
     E: 0,
+    F: 0,
     EXPORT: 0,
   };
   return Object.prototype.hasOwnProperty.call(rates, tg) ? rates[tg] : 0;
@@ -48,7 +49,7 @@ const calcVatRateForTaxGroup = (taxGroup) => {
 
 const calculateVatForItem = (item) => {
   const qty = toNumber(item?.quantity);
-  const unitPrice = toNumber(item?.unitPrice);
+  const unitPrice = toNumber(item?.unitPrice ?? item?.price);
   if (qty === null || unitPrice === null) return 0;
   const base = qty * unitPrice;
   const rate = calcVatRateForTaxGroup(item?.taxGroup);
@@ -105,11 +106,11 @@ const validateInvoicePayload = (payload) => {
     const taxGroup = safeTrim(item?.taxGroup).toUpperCase();
     if (!taxGroup || !ALLOWED_TAX_GROUPS.has(taxGroup)) {
       throw new Error(
-        `ARTICLE_TAXGROUP_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - taxGroup invalide ou manquant. Valeurs autorisées: A,B,C,D,E,EXPORT`
+        `ARTICLE_TAXGROUP_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - taxGroup invalide ou manquant. Valeurs autorisées: A,B,C,D,E,F,EXPORT`
       );
     }
     const qty = toNumber(item?.quantity);
-    const unitPrice = toNumber(item?.unitPrice);
+    const unitPrice = toNumber(item?.unitPrice ?? item?.price);
     if (qty === null || qty <= 0) {
       throw new Error(`ARTICLE_QUANTITE_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - quantité invalide`);
     }
@@ -117,11 +118,12 @@ const validateInvoicePayload = (payload) => {
       throw new Error(`ARTICLE_PRIX_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - prix unitaire invalide`);
     }
 
-    if (item?.specificTax !== undefined && item?.specificTax !== null) {
-      const st = toNumber(item.specificTax);
+    const specificTax = item?.specificTax ?? item?.taxSpecific;
+    if (specificTax !== undefined && specificTax !== null) {
+      const st = toNumber(specificTax);
       if (st === null || st < 0) {
         throw new Error(
-          `ARTICLE_TAXE_SPECIFIQUE_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - specificTax doit être >= 0`
+          `ARTICLE_TAXE_SPECIFIQUE_INVALIDE: Article ${index}${name ? ` (${name})` : ''} - specificTax/taxSpecific doit être >= 0`
         );
       }
     }
@@ -184,16 +186,17 @@ const normalizeItems = (payload) => {
   return items.map((item) => {
     const taxGroup = safeTrim(item?.taxGroup).toUpperCase();
     const quantity = toNumber(item?.quantity) ?? 0;
-    const unitPrice = toNumber(item?.unitPrice) ?? 0;
-    const specificTax = toNumber(item?.specificTax) ?? 0;
+    const unitPrice = toNumber(item?.unitPrice ?? item?.price) ?? 0;
+    const specificTax = toNumber(item?.specificTax ?? item?.taxSpecific) ?? 0;
     const vatAmount = calculateVatForItem({ ...item, taxGroup, quantity, unitPrice });
     const totalAmount = Math.round(quantity * unitPrice) + Math.round(specificTax);
     return {
       name: safeTrim(item?.name || item?.description || 'Article'),
       quantity,
-      unitPrice,
-      specificTax,
+      price: unitPrice,
       taxGroup,
+      ...(specificTax > 0 ? { taxSpecific: specificTax } : {}),
+      // keep vatAmount and totalAmount internally if needed for logging
       vatAmount,
       totalAmount,
     };
@@ -271,7 +274,7 @@ const normalizeEmcfPayload = (payload, emcfInfo = {}) => {
 
 const makeSafeLogMeta = (normalizedPayload) => {
   const itemsForHash = Array.isArray(normalizedPayload?.items)
-    ? normalizedPayload.items.map((it) => ({ taxGroup: it.taxGroup, quantity: it.quantity, unitPrice: it.unitPrice, specificTax: it.specificTax || 0 }))
+    ? normalizedPayload.items.map((it) => ({ taxGroup: it.taxGroup, quantity: it.quantity, price: it.price, taxSpecific: it.taxSpecific || 0 }))
     : [];
 
   const customerForHash = normalizedPayload?.customer

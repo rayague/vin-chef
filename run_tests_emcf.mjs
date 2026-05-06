@@ -819,15 +819,19 @@ async function main() {
       const attempts = [];
       let success = null;
 
-      // Phase 1: detect a valid credit-note type (prefer the one that yields errorCode=4)
+      // Phase 1: detect a valid credit-note type (prefer the one that yields errorCode=4 or success)
       let selectedType = null;
       for (const t of typeCandidates) {
         try {
-          const result = await submitInvoice({ type: t, autoFinalize: false });
+          const result = await submitInvoice({ 
+            type: t, 
+            autoFinalize: false,
+            extraFields: { originalInvoiceReference: original.uid, reference: original.uid }
+          });
           attempts.push({ phase: 'type-detect', type: t, ok: true, uid: result.uid });
           if (result.uid) {
             selectedType = t;
-            success = { type: t, referenceVariant: 'none', result };
+            success = { type: t, referenceVariant: 'both', result };
             break;
           }
         } catch (inner) {

@@ -119,6 +119,8 @@ const Invoices = () => {
       emcfDateTime?: string;
       emcfCounters?: string;
       emcfNim?: string;
+      createdBy?: string;
+      originalInvoiceReference?: string;
     };
 
     let emcfQrCodeDataUrl: string | undefined;
@@ -162,6 +164,8 @@ const Invoices = () => {
       emcfDateTime: anyInv.emcfDateTime,
       emcfCounters: anyInv.emcfCounters,
       emcfNim: anyInv.emcfNim,
+      operatorName: anyInv.createdBy,
+      originalInvoiceReference: anyInv.originalInvoiceReference,
     });
   // Open PDF in new tab
   const url = (doc as unknown as { output: (format: string) => string }).output('bloburl');
@@ -180,6 +184,8 @@ const Invoices = () => {
       emcfDateTime?: string;
       emcfCounters?: string;
       emcfNim?: string;
+      createdBy?: string;
+      originalInvoiceReference?: string;
     };
 
     let emcfQrCodeDataUrl: string | undefined;
@@ -218,6 +224,8 @@ const Invoices = () => {
       emcfDateTime: anyInv.emcfDateTime,
       emcfCounters: anyInv.emcfCounters,
       emcfNim: anyInv.emcfNim,
+      operatorName: anyInv.createdBy,
+      originalInvoiceReference: anyInv.originalInvoiceReference,
     });
     downloadInvoice(invoice.invoiceNumber, doc);
   };

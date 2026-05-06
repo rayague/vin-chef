@@ -337,11 +337,11 @@ const Sales = () => {
             price,
             quantity: it.quantity,
             taxGroup,
-            ...(st > 0 ? { specificTax: st } : {}),
+            ...(st > 0 ? { taxSpecific: st } : {}),
           };
         });
 
-        const totalHTInt = emcfItems.reduce((s, it) => s + (it.unitPrice * it.quantity) + (Number((it as unknown as { specificTax?: number }).specificTax || 0) || 0), 0);
+        const totalHTInt = emcfItems.reduce((s, it) => s + (it.unitPrice * it.quantity) + (Number((it as unknown as { taxSpecific?: number }).taxSpecific || 0) || 0), 0);
         const tvaInt = emcfItems.reduce((s, it) => {
           const g = String((it as unknown as { taxGroup?: string }).taxGroup || 'B').toUpperCase() as NonNullable<Product['taxGroup']>;
           const rate = taxGroupToTvaRate(g);
