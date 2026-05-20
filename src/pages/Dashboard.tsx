@@ -104,8 +104,8 @@ const Dashboard = () => {
           <div className="flex items-center gap-3">
             <img src={logoSrc} className="w-10 h-10 object-contain rounded-full" alt="Logo" />
             <div>
-              <h1 className="text-2xl font-bold">Business Fifa Center</h1>
-              <p className="text-muted-foreground">Gestion de cave à vin</p>
+              <h1 className="text-2xl font-bold">BUSINESS CENTER FIFA</h1>
+              <p className="text-muted-foreground">FIFA SERVICES</p>
             </div>
           </div>
         </div>

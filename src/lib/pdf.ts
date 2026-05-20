@@ -37,17 +37,22 @@ export interface InvoiceData {
 }
 
 // Company info (configurable)
+// Source: IFU 0202368226611, RCCM RB/COT/25 A 110025 du 28-05-2025
+// Enseigne: FIFA SERVICES, Nom commercial: BUSINESS CENTER FIFA
 const COMPANY_INFO = {
-  name: 'Business Fifa Center',
-  address: 'Avenue de la République',
+  name: 'BUSINESS CENTER FIFA',
+  // Enseigne (pour affichage alternatif sur certains documents)
+  tradeName: 'FIFA SERVICES',
+  address: 'Îlot 534, Parcelle C, Maison Godonou Nestor ABEHO, TANTO',
   city: 'Cotonou',
+  district: '1ER ARRONDISSEMENT',
   country: 'Bénin',
-  phone: '+229 21 00 00 00',
-  email: 'contact@cavepremium.bj',
+  phone: '0196807469',
+  email: 'fifameservices01@gmail.com',
   ifu: '0202368226611',
-  nim: 'TS01017752',
-  rcs: 'RC/ESE/2025/0001', // Registre du Commerce et des Sociétés
-  rccm: 'RCCM RB/COT/25 B 0001', // Numéro RCCM_RB pour affichage
+  nim: '', // À obtenir auprès de la DGI
+  rcs: '', // Registre du Commerce et des Sociétés (non fourni dans les documents)
+  rccm: 'RB/COT/25 A 110025', // RCCM du 28-05-2025
   tvaNumber: '0202368226611',
 };
 
@@ -117,14 +122,21 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.text(COMPANY_INFO.name, companyX, 20);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${COMPANY_INFO.address}`, companyX, 25);
-  doc.text(`${COMPANY_INFO.city} - ${COMPANY_INFO.country}`, companyX, 29);
-  doc.text(`Tél: ${COMPANY_INFO.phone}`, companyX, 33);
-  doc.text(`Email: ${COMPANY_INFO.email}`, companyX, 37);
-  doc.text(`IFU: ${COMPANY_INFO.ifu}`, companyX, 41);
-  doc.text(`NIM: ${COMPANY_INFO.nim}`, companyX, 45);
-  doc.text(`RCS: ${COMPANY_INFO.rcs}`, companyX, 49);
-  doc.text(`RCCM_RB: ${COMPANY_INFO.rccm}`, companyX, 53);
+  doc.text(`${COMPANY_INFO.tradeName}`, companyX, 25);
+  doc.text(`${COMPANY_INFO.address}`, companyX, 29);
+  const cityLine = COMPANY_INFO.district 
+    ? `${COMPANY_INFO.city}, ${COMPANY_INFO.district}` 
+    : COMPANY_INFO.city;
+  doc.text(`${cityLine} - ${COMPANY_INFO.country}`, companyX, 33);
+  doc.text(`Tél: ${COMPANY_INFO.phone}`, companyX, 37);
+  doc.text(`Email: ${COMPANY_INFO.email}`, companyX, 41);
+  doc.text(`IFU: ${COMPANY_INFO.ifu}`, companyX, 45);
+  if (COMPANY_INFO.rccm) {
+    doc.text(`RCCM: ${COMPANY_INFO.rccm}`, companyX, 49);
+  }
+  if (COMPANY_INFO.nim) {
+    doc.text(`NIM: ${COMPANY_INFO.nim}`, companyX, 53);
+  }
   doc.text(`N° TVA: ${COMPANY_INFO.tvaNumber}`, companyX, 57);
   const companyBottomY = 57;
 
@@ -546,6 +558,9 @@ export const generateStockReportPDF = (
   doc.setFont('helvetica', 'normal');
   doc.text(`${COMPANY_INFO.address}, ${COMPANY_INFO.city}`, 15, 40);
   doc.text(`Tél: ${COMPANY_INFO.phone} | Email: ${COMPANY_INFO.email}`, 15, 45);
+  if (COMPANY_INFO.rccm) {
+    doc.text(`RCCM: ${COMPANY_INFO.rccm} | IFU: ${COMPANY_INFO.ifu}`, 15, 50);
+  }
 
   // Report info (date range, filters)
   doc.setFontSize(9);
