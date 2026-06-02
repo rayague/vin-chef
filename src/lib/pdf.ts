@@ -197,7 +197,7 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     doc.setTextColor(primary[0], primary[1], primary[2]);
     let emcfY = 49;
     if (data.emcfCodeMECeFDGI) {
-      const lines = doc.splitTextToSize(`Code: ${data.emcfCodeMECeFDGI}`, emcfMaxWidth) as string[];
+      const lines = doc.splitTextToSize(`Code MECeF: ${formatMecEfCode(data.emcfCodeMECeFDGI)}`, emcfMaxWidth) as string[];
       const r = writeLines(lines, emcfY);
       emcfY = r.y;
     }
@@ -266,14 +266,15 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     data.items.forEach(item => {
       const lineTotal = item.unitPrice * item.quantity - (item.discount || 0);
       const tg = item.taxGroup ? String(item.taxGroup).toUpperCase() : '';
-      const tgLabel = tg === 'A' || tg === 'E' ? 'EXO' : tg;
+      const LABEL: Record<string, string> = { A: 'EXO', B: 'TAX', C: 'EXP', D: 'MP', E: 'TPS', F: 'RES' };
+      const tgLabel = tg ? (LABEL[tg] || tg) : '—';
       const st = (item.specificTax !== undefined && item.specificTax !== null) ? Number(item.specificTax) : 0;
       rows.push([
-        `[${tgLabel || '-'}] ${item.description}`,
+        item.description,
         String(item.quantity),
         formatCurrency(item.unitPrice),
         formatCurrency(lineTotal),
-        tgLabel || '—',
+        tgLabel,
         st > 0 ? formatCurrency(st) : '—',
       ]);
     });
@@ -295,7 +296,7 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       { content: 'Qté', styles: { halign: 'center' } },
       { content: 'P.U. HT (FCFA)', styles: { halign: 'right' } },
       { content: 'Total HT (FCFA)', styles: { halign: 'right' } },
-      { content: (data.items && data.items.length > 0) ? 'Taxe' : 'TVA %', styles: { halign: 'right' } },
+      { content: (data.items && data.items.length > 0) ? 'Rég.' : 'TVA %', styles: { halign: 'center' } },
       { content: (data.items && data.items.length > 0) ? 'Taxe spéc.' : 'Montant TVA (FCFA)', styles: { halign: 'right' } },
     ]],
     body: rows,

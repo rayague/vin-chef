@@ -33,13 +33,14 @@ const safeTrim = (v) => {
 
 const calcVatRateForTaxGroup = (taxGroup) => {
   const tg = safeTrim(taxGroup).toUpperCase();
-  // Barème TVA officiel DGI (e-MECeF)
-  // A: Exonéré (0%), B: Normal (18%), C: Réduit (10%), D: Spécial (5%), E: Zéro (0%), EXPORT: Export (0%)
+  // Barème TVA officiel DGI (e-MECeF) — cf. spec API v1.0 TaxGroupsDto
+  // A: EXO Exonéré (0%), B: TAX Taxable (18%), C: EXP Exportation produits taxables (0%)
+  // D: MP TVA régime d'exception (18%), E: TPS Régime fiscal TPS (0%), F: RES Réservé (0%)
   const rates = {
     A: 0,
     B: 18,
-    C: 10,
-    D: 5,
+    C: 0,
+    D: 18,
     E: 0,
     F: 0,
     EXPORT: 0,
@@ -215,11 +216,12 @@ const mapInvoiceTypeForApi = (type) => {
   const t = safeTrim(type).toUpperCase();
   // The DGI API uses FA (avoir) and distinct export codes.
   // Keep app-facing types unchanged; map only for API submission.
+  // Spec DGI v1.0 : FV=Facture vente, FA=Facture avoir, EV=Facture vente exportation, EA=Facture avoir exportation
   const mapping = {
     FV: 'FV',
     AV: 'FA',
-    FV_EXPORT: 'FV_EXPORT',
-    AV_EXPORT: 'FA_EXPORT',
+    FV_EXPORT: 'EV',
+    AV_EXPORT: 'EA',
   };
   return Object.prototype.hasOwnProperty.call(mapping, t) ? mapping[t] : t;
 };

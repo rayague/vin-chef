@@ -32,13 +32,16 @@ const Invoices = () => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsInvoice, setDetailsInvoice] = useState<Invoice | null>(null);
   const [isGeneratingPdfId, setIsGeneratingPdfId] = useState<string | null>(null);
+  const [users, setUsers] = useState<Array<{ id: string; username: string }>>([]);
 
   const loadInvoices = useCallback(async () => {
     try {
-      const list = await db.getInvoices();
+      const [list, u] = await Promise.all([db.getInvoices(), db.getUsers()]);
       setInvoices(list as Invoice[]);
+      setUsers((u as unknown as { id: string; username: string }[]) || []);
     } catch {
       setInvoices([]);
+      setUsers([]);
     }
   }, []);
 
@@ -108,7 +111,7 @@ const Invoices = () => {
 
   const handlePreview = async (invoice: Invoice) => {
     const anyInv = invoice as unknown as Invoice & {
-      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
+      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
       clientIFU?: string;
       tvaRate?: number;
       clientAddress?: string;
@@ -164,7 +167,7 @@ const Invoices = () => {
       emcfDateTime: anyInv.emcfDateTime,
       emcfCounters: anyInv.emcfCounters,
       emcfNim: anyInv.emcfNim,
-      operatorName: anyInv.createdBy,
+      operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
       originalInvoiceReference: anyInv.originalInvoiceReference,
     });
   // Open PDF in new tab
@@ -174,7 +177,7 @@ const Invoices = () => {
 
   const handleDownload = async (invoice: Invoice) => {
     const anyInv = invoice as unknown as Invoice & {
-      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number }>;
+      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
       clientIFU?: string;
       tvaRate?: number;
       clientAddress?: string;
@@ -224,7 +227,7 @@ const Invoices = () => {
       emcfDateTime: anyInv.emcfDateTime,
       emcfCounters: anyInv.emcfCounters,
       emcfNim: anyInv.emcfNim,
-      operatorName: anyInv.createdBy,
+      operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
       originalInvoiceReference: anyInv.originalInvoiceReference,
     });
     downloadInvoice(invoice.invoiceNumber, doc);
@@ -386,7 +389,7 @@ const Invoices = () => {
           setDetailsOpen(open);
           if (!open) setDetailsInvoice(null);
         }}
-        invoice={detailsInvoice as unknown as (Invoice & { items?: Array<{ description?: string; name?: string; quantity: number; unitPrice: number; discount?: number }>; clientAddress?: string; clientPhone?: string; }) | null}
+        invoice={detailsInvoice as unknown as (Invoice & { items?: Array<{ description?: string; name?: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>; clientAddress?: string; clientPhone?: string; }) | null}
         onPreview={handlePreview}
         onDownload={handleDownload}
       />

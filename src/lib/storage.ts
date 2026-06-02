@@ -14,7 +14,7 @@ export interface Product {
   unitPrice: number;
   stockQuantity: number;
   description: string;
-  taxGroup?: 'A' | 'B' | 'C' | 'D' | 'E' | 'EXPORT';
+  taxGroup?: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'EXPORT';
   tvaRate?: number;
 }
 
@@ -49,6 +49,7 @@ export interface Sale {
     productId: string;
     quantity: number;
     unitPrice: number;
+    taxGroup?: string;
     specificTax?: number; // Montant fixe ajouté à la ligne (ex: taxe spécifique / taxe de séjour)
     discount?: number; // amount
     discountType?: 'percentage' | 'fixed';

@@ -41,10 +41,11 @@ const Products = () => {
 
   const taxGroupToTvaRate = (g: NonNullable<Product['taxGroup']>): number => {
     if (g === 'B') return 18;
-    if (g === 'C') return 10;
-    if (g === 'D') return 5;
+    if (g === 'D') return 18;
     if (g === 'A') return 0;
+    if (g === 'C') return 0;
     if (g === 'E') return 0;
+    if (g === 'F') return 0;
     if (g === 'EXPORT') return 0;
     return 18;
   };
@@ -331,12 +332,12 @@ const Products = () => {
                               <SelectValue placeholder="Sélectionner" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="B">B — TVA 18%</SelectItem>
-                              <SelectItem value="C">C — TVA 10%</SelectItem>
-                              <SelectItem value="D">D — TVA 5%</SelectItem>
-                              <SelectItem value="A">A — Exonéré 0%</SelectItem>
-                              <SelectItem value="E">E — TVA 0%</SelectItem>
-                              <SelectItem value="EXPORT">EXPORT — TVA 0%</SelectItem>
+                              <SelectItem value="A">A — EXO 0% (Exonéré)</SelectItem>
+                              <SelectItem value="B">B — TAX 18% (Taxable)</SelectItem>
+                              <SelectItem value="C">C — EXP 0% (Exportation produits taxables)</SelectItem>
+                              <SelectItem value="D">D — MP 18% (TVA régime d'exception)</SelectItem>
+                              <SelectItem value="E">E — TPS 0% (Régime fiscal TPS)</SelectItem>
+                              <SelectItem value="F">F — RES 0% (Réservé)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

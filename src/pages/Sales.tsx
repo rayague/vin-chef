@@ -79,10 +79,11 @@ const Sales = () => {
 
   const taxGroupToTvaRate = (g: NonNullable<Product['taxGroup']>): number => {
     if (g === 'B') return 18;
-    if (g === 'C') return 10;
-    if (g === 'D') return 5;
+    if (g === 'D') return 18;
     if (g === 'A') return 0;
+    if (g === 'C') return 0;
     if (g === 'E') return 0;
+    if (g === 'F') return 0;
     if (g === 'EXPORT') return 0;
     return 18;
   };
@@ -170,6 +171,13 @@ const Sales = () => {
     if (anyClient.discount !== undefined && anyClient.discount !== null) {
       setItems(prev => prev.map(it => ({ ...it, discount: String(anyClient.discount), discountType: anyClient.discountType || 'percentage' })));
     }
+    // Auto-select AIB rate based on client IFU (Bénin: IFU → AIB 1%, no IFU → AIB 0%)
+    const clientIfu = (anyClient as unknown as { ifu?: string }).ifu;
+    if (clientIfu && /^[A-Z0-9]{13}$/i.test(clientIfu)) {
+      setFormData(prev => ({ ...prev, aibRateOverride: '1' }));
+    } else {
+      setFormData(prev => ({ ...prev, aibRateOverride: '' }));
+    }
   }, [formData.clientId, clients]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -182,6 +190,11 @@ const Sales = () => {
     }
     const client = clients.find(c => c.id === formData.clientId);
     if (!client) return;
+    const clientIfu = (client as unknown as { ifu?: string }).ifu;
+    if (clientIfu && !/^[A-Z0-9]{13}$/i.test(clientIfu)) {
+      toast({ title: 'Erreur', description: "L'IFU du client doit contenir exactement 13 caractères alphanumériques", variant: 'destructive' });
+      return;
+    }
 
     // Validate items
     const validItems = items.filter(it => it.productId && Number.parseFloat(String(it.quantity)) > 0);
@@ -265,14 +278,14 @@ const Sales = () => {
       totalHT += lineTotalHT;
       totalDiscount += discountAmount;
 
-      const g = ((prod as unknown as Product).taxGroup || (isExport ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
+      const g = ((prod as unknown as Product).taxGroup || (isExport ? 'C' : 'B')) as NonNullable<Product['taxGroup']>;
       const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
       const vatBase = Math.max(0, (unit * q - discountAmount));
       const lineVat = Math.round(vatBase * (rate / 100));
       totalVat += lineVat;
 
       itemsPayload.push({ description: prod.name, quantity: q, unitPrice: unit, taxGroup: g, specificTax: st > 0 ? st : undefined, discount: discountAmount > 0 ? discountAmount : undefined });
-      normalizedItems.push({ productId: it.productId, quantity: q, specificTax: st > 0 ? st : undefined, discount: d > 0 ? d : undefined, discountType: it.discountType });
+      normalizedItems.push({ productId: it.productId, quantity: q, taxGroup: g, specificTax: st > 0 ? st : undefined, discount: d > 0 ? d : undefined, discountType: it.discountType });
     }
 
     if (!Number.isFinite(totalHT) || !Number.isFinite(totalDiscount)) {
@@ -329,7 +342,7 @@ const Sales = () => {
 
           const st = Math.max(0, Math.round(Number(it.specificTax || 0)));
 
-          const taxGroup = ((prod.taxGroup || (isExport ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>);
+          const taxGroup = ((prod.taxGroup || (isExport ? 'C' : 'B')) as NonNullable<Product['taxGroup']>);
           return {
             code: prod.id,
             name: prod.name,
@@ -365,9 +378,11 @@ const Sales = () => {
         const originalCode = (original as unknown as Invoice & { emcfCodeMECeFDGI?: string })?.emcfCodeMECeFDGI;
         const code24 = originalCode ? String(originalCode).replace(/-/g, '').trim() : '';
 
+        const invoiceDate = new Date().toISOString();
         const payload = {
           ifu: vendorIfu,
-          type: invoiceType === 'FV_EXPORT' ? 'FV' : invoiceType === 'AV_EXPORT' ? 'AV' : invoiceType,
+          type: invoiceType, // mapInvoiceTypeForApi in emcf-validation.cjs converts FV_EXPORT→EV, AV_EXPORT→EA per DGI spec
+          dateTime: invoiceDate,
           items: emcfItems,
           customer: {
             name: client.name,
@@ -396,6 +411,7 @@ const Sales = () => {
           paymentMethods,
           aibRate,
           aibAmount,
+          aib: aibRate === 1 ? 'A' : aibRate === 5 ? 'B' : undefined,
           ...(isAvoir
             ? {
                 // DGI expects the original invoice reference as the MECeF DGI code (exactly 24 chars), not the UUID uid.
@@ -463,14 +479,18 @@ const Sales = () => {
       createdBy: user?.id,
       discount: totalDiscount > 0 ? totalDiscount : undefined,
       discountType: totalDiscount > 0 ? 'fixed' : undefined,
-      items: validItems.map(it => ({
-        productId: it.productId,
-        quantity: Number.parseFloat(String(it.quantity)),
-        unitPrice: products.find(p => p.id === it.productId)!.unitPrice,
-        specificTax: it.specificTax ? Math.round(parseMoney(it.specificTax)) : undefined,
-        discount: parseFloat(it.discount) || undefined,
-        discountType: it.discountType,
-      })),
+      items: validItems.map(it => {
+        const prod = products.find(p => p.id === it.productId);
+        return {
+          productId: it.productId,
+          quantity: Number.parseFloat(String(it.quantity)),
+          unitPrice: prod!.unitPrice,
+          taxGroup: (prod?.taxGroup || (isExport ? 'C' : 'B')) as NonNullable<Product['taxGroup']>,
+          specificTax: it.specificTax ? Math.round(parseMoney(it.specificTax)) : undefined,
+          discount: parseFloat(it.discount) || undefined,
+          discountType: it.discountType,
+        };
+      }),
     } as Sale;
 
     setSaving(true);
@@ -864,9 +884,10 @@ const Sales = () => {
                                   <div className="h-10 flex items-center rounded border px-3 text-sm text-muted-foreground">
                                     {(() => {
                                       const prod = products.find(p => p.id === it.productId);
-                                      const raw = (prod && (prod.taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B'))) || '';
+                                      const raw = (prod && (prod.taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'C' : 'B'))) || '';
                                       const tg = String(raw || '').toUpperCase();
-                                      return tg === 'A' || tg === 'E' ? 'EXO' : (tg || '—');
+                                      const label = ({ A: 'EXO', B: 'TAX', C: 'EXP', D: 'MP', E: 'TPS', F: 'RES' } as Record<string, string>)[tg] || tg || '—';
+                                      return label;
                                     })()}
                                   </div>
                                 </div>
@@ -938,7 +959,7 @@ const Sales = () => {
                               totalHT += unit * q - discountAmount + st;
                               totalDiscount += discountAmount;
 
-                              const g = ((prod as unknown as Product).taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'EXPORT' : 'B')) as NonNullable<Product['taxGroup']>;
+                              const g = ((prod as unknown as Product).taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'C' : 'B')) as NonNullable<Product['taxGroup']>;
                               const rate = Number((prod as unknown as Product).tvaRate ?? taxGroupToTvaRate(g));
                               const vatBase = Math.max(0, (unit * q - discountAmount));
                               totalVat += Math.round(vatBase * (rate / 100));
