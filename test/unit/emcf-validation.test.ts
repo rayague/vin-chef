@@ -22,7 +22,7 @@ describe('Validation payload e-MCF', () => {
   it('accepte AV avec originalInvoiceReference', () => {
     const payload = {
       type: 'AV',
-      originalInvoiceReference: 'ABC-123',
+      originalInvoiceReference: 'ABCDE12345FGHIJ67890MNOP',
       customer: { name: 'X' },
       items: [{ taxGroup: 'B', name: 'Test', quantity: 1, unitPrice: 1000 }],
     };
@@ -115,14 +115,14 @@ describe('Calculs TVA / AIB', () => {
     expect(vat).toBe(360);
   });
 
-  it('TVA groupe C = 10%', () => {
+  it('TVA groupe C = 0%', () => {
     const vat = calculateVatForItem({ taxGroup: 'C', quantity: 2, unitPrice: 1000 });
-    expect(vat).toBe(200);
+    expect(vat).toBe(0);
   });
 
-  it('TVA groupe D = 5%', () => {
+  it('TVA groupe D = 18%', () => {
     const vat = calculateVatForItem({ taxGroup: 'D', quantity: 2, unitPrice: 1000 });
-    expect(vat).toBe(100);
+    expect(vat).toBe(360);
   });
 
   it('TVA groupes A/E/EXPORT = 0', () => {

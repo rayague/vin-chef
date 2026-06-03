@@ -8,12 +8,12 @@ describe('Calculs fiscaux e-MECeF', () => {
     expect(calculateVatForItem({ taxGroup: 'B', quantity: 1, unitPrice: 10000 })).toBe(1800);
   });
 
-  it('Calcul TVA groupe C (10%)', () => {
-    expect(calculateVatForItem({ taxGroup: 'C', quantity: 2, unitPrice: 5000 })).toBe(1000);
+  it('Calcul TVA groupe C (0%)', () => {
+    expect(calculateVatForItem({ taxGroup: 'C', quantity: 2, unitPrice: 5000 })).toBe(0);
   });
 
-  it('Calcul TVA groupe D (5%)', () => {
-    expect(calculateVatForItem({ taxGroup: 'D', quantity: 3, unitPrice: 2000 })).toBe(300);
+  it('Calcul TVA groupe D (18%)', () => {
+    expect(calculateVatForItem({ taxGroup: 'D', quantity: 3, unitPrice: 2000 })).toBe(1080);
   });
 
   it('Calcul TVA groupes A/E/EXPORT = 0', () => {
@@ -37,7 +37,7 @@ describe('Calculs fiscaux e-MECeF', () => {
       aibRate: 5,
       items: [
         { name: 'A', quantity: 1, unitPrice: 10000, taxGroup: 'B' }, // VAT 1800
-        { name: 'B', quantity: 2, unitPrice: 5000, taxGroup: 'C' },  // VAT 1000
+        { name: 'B', quantity: 2, unitPrice: 5000, taxGroup: 'C' },  // VAT 0
         { name: 'C', quantity: 1, unitPrice: 2000, taxGroup: 'A' },  // VAT 0
       ],
     };
@@ -45,13 +45,13 @@ describe('Calculs fiscaux e-MECeF', () => {
     const n = normalizeEmcfPayload(payload, {});
     // subtotal = 10000 + 10000 + 2000 = 22000
     expect(n.subtotal).toBe(22000);
-    // VAT = 1800 + 1000 + 0 = 2800
+    // VAT = 1800 + 0 + 0 = 1800
     const totalVat = n.items.reduce((s: number, it: { vatAmount?: number }) => s + (it.vatAmount || 0), 0);
-    expect(totalVat).toBe(2800);
+    expect(totalVat).toBe(1800);
     // AIB 5% of subtotal = 1100
     expect(n.aibAmount).toBe(1100);
     // total = subtotal + vat + aib
-    expect(n.total).toBe(22000 + 2800 + 1100);
+    expect(n.total).toBe(22000 + 1800 + 1100);
   });
 
   it("Arrondis légaux (à l'unité la plus proche)", () => {

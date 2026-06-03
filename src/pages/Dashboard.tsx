@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import db from '@/lib/db';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import type { Sale, Product, Client } from '@/lib/storage';
 import { Package, Users, TrendingUp, FileText, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import PageContainer from '@/components/PageContainer';
@@ -33,43 +34,38 @@ const Dashboard = () => {
     (async () => {
       const [sales, products, clients] = await Promise.all([db.getSales(), db.getProducts(), db.getClients()]);
 
-      // If non-admin, only consider their sales
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allSales = (sales as unknown as any[]) || [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const visibleSales = user && user.role !== 'admin' ? allSales.filter(s => (s as any).createdBy === user.id) : allSales;
+      const salesAs = (sales as unknown as Sale[]) || [];
+      const productsAs = (products as unknown as Product[]) || [];
+      const clientsAs = (clients as unknown as Client[]) || [];
+
+      const visibleSales = user && user.role !== 'admin' ? salesAs.filter(s => s.createdBy === user.id) : salesAs;
 
       const totalRevenue = visibleSales.reduce((sum, sale) => sum + (sale.totalPrice || 0), 0);
-    
-    // Calculate top products
-    const productSales = new Map<string, number>();
+
+      const productSales = new Map<string, number>();
       visibleSales.forEach(sale => {
         const current = productSales.get(sale.productId) || 0;
-        productSales.set(sale.productId, current + sale.quantity);
+        productSales.set(sale.productId, current + (sale.quantity || 0));
       });
 
-    const topProducts = Array.from(productSales.entries())
-      .map(([productId, quantity]) => {
-        const product = products.find(p => p.id === productId);
-        return {
-          name: product?.name || 'Unknown',
-          sales: quantity,
-        };
-      })
-      .sort((a, b) => b.sales - a.sales)
-      .slice(0, 5);
+      const topProducts = Array.from(productSales.entries())
+        .map(([productId, quantity]) => {
+          const product = productsAs.find(p => p.id === productId);
+          return {
+            name: product?.name || 'Unknown',
+            sales: quantity,
+          };
+        })
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 5);
 
-    // Recent sales
       const recentSales = visibleSales
         .slice()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  .sort((a, b) => new Date((b as any).date).getTime() - new Date((a as any).date).getTime())
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 5)
         .map(sale => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const product = (products as any[]).find(p => p.id === (sale as any).productId);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const client = (clients as any[]).find(c => c.id === (sale as any).clientId);
+          const product = productsAs.find(p => p.id === sale.productId);
+          const client = clientsAs.find(c => c.id === sale.clientId);
           return {
             ...sale,
             productName: product?.name || 'N/A',
@@ -80,10 +76,8 @@ const Dashboard = () => {
       setStats({
         totalRevenue,
         totalSales: visibleSales.length,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  totalProducts: (products as any[]).length,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  totalClients: (clients as any[]).length,
+        totalProducts: productsAs.length,
+        totalClients: clientsAs.length,
         topProducts,
         recentSales,
       });

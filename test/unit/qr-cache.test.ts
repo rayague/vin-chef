@@ -26,8 +26,9 @@ describe('qrCodeCache', () => {
   });
 
   it('Regénère quand expiré (TTL)', async () => {
-    const { qrCodeCache } = await import('../../src/lib/qr-cache');
     const QRCode = (await import('qrcode')).default as unknown as { toDataURL: ReturnType<typeof vi.fn> };
+    QRCode.toDataURL.mockClear();
+    const { qrCodeCache } = await import('../../src/lib/qr-cache');
 
     qrCodeCache.clear();
 

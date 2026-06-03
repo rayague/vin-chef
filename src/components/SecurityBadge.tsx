@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import QRCode from 'qrcode';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { formatMecEfCode } from '@/lib/security-utils';
+import { qrCodeCache } from '@/lib/qr-cache';
 
 export interface SecurityBadgeProps {
   emcfCodeMECeFDGI?: string;
@@ -14,14 +15,6 @@ export interface SecurityBadgeProps {
   emcfStatus?: string;
   emcfDateTime?: string;
 }
-
-const formatMecEfCode = (code?: string) => {
-  const raw = String(code || '').replace(/\s+/g, '').trim();
-  if (!raw) return '';
-  const clean = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  const chunks = clean.match(/.{1,5}/g) || [clean];
-  return chunks.join('-');
-};
 
 const computeStatus = (emcfStatus?: string, emcfCodeMECeFDGI?: string) => {
   if (emcfCodeMECeFDGI) return { label: 'VALIDE', variant: 'default' as const };
@@ -35,7 +28,7 @@ const computeStatus = (emcfStatus?: string, emcfCodeMECeFDGI?: string) => {
 const makeQrDataUrl = async (value: string) => {
   const v = String(value || '').trim();
   if (!v) return null;
-  return QRCode.toDataURL(v, { margin: 1, width: 240 });
+  return qrCodeCache.getDataUrl(v, { margin: 1, width: 240 });
 };
 
 export default function SecurityBadge(props: SecurityBadgeProps) {

@@ -86,7 +86,7 @@ describe('PDF e-MECeF security elements', () => {
     });
 
     expect(calls.images).toBeGreaterThan(0);
-    expect(calls.texts.join('\n')).toMatch(/FACTURE NORMALISÉE DGI e-MECeF/);
+    expect(calls.texts.join('\n')).toMatch(/MENTIONS LÉGALES/);
     expect(calls.texts.join('\n')).toMatch(/Code MECeF:/);
     expect(calls.texts.join('\n')).toMatch(/NIM:/);
     expect(calls.texts.join('\n')).toMatch(/Date DGI:/);

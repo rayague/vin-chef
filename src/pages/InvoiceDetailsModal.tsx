@@ -78,6 +78,7 @@ export default function InvoiceDetailsModal({ open, onOpenChange, invoice, onPre
               <div className="text-muted-foreground">Date: {invoiceDate}</div>
               <div className="text-muted-foreground">Total: {invoice.totalPrice.toLocaleString('fr-FR')} FCFA</div>
               {invAny.emcfStatus ? <div className="mt-2"><Badge variant="secondary">e‑MCF: {invAny.emcfStatus}</Badge></div> : null}
+              {invAny.emcfCounters ? <div className="text-xs text-muted-foreground mt-1">Compteurs: {String(invAny.emcfCounters)}</div> : null}
             </div>
           </div>
         </div>

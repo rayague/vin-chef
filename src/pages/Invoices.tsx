@@ -110,127 +110,131 @@ const Invoices = () => {
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handlePreview = async (invoice: Invoice) => {
-    const anyInv = invoice as unknown as Invoice & {
-      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
-      clientIFU?: string;
-      tvaRate?: number;
-      clientAddress?: string;
-      clientPhone?: string;
-      emcfStatus?: string;
-      emcfCodeMECeFDGI?: string;
-      emcfQrCode?: string;
-      emcfDateTime?: string;
-      emcfCounters?: string;
-      emcfNim?: string;
-      createdBy?: string;
-      originalInvoiceReference?: string;
-    };
+    setIsGeneratingPdfId(String(invoice.id));
+    try {
+      const anyInv = invoice as unknown as Invoice & {
+        items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
+        clientIFU?: string;
+        tvaRate?: number;
+        clientAddress?: string;
+        clientPhone?: string;
+        emcfStatus?: string;
+        emcfCodeMECeFDGI?: string;
+        emcfQrCode?: string;
+        emcfDateTime?: string;
+        emcfCounters?: string;
+        emcfNim?: string;
+        createdBy?: string;
+        originalInvoiceReference?: string;
+      };
 
-    let emcfQrCodeDataUrl: string | undefined;
-    if (anyInv.emcfQrCode) {
-      console.log('Facture', invoice.invoiceNumber, 'emcfQrCode present:', anyInv.emcfQrCode);
-      try {
-        setIsGeneratingPdfId(String(invoice.id));
-        emcfQrCodeDataUrl = await qrCodeCache.getDataUrl(String(anyInv.emcfQrCode), { margin: 1, width: 300 });
-        console.log('QR dataURL generated, length:', emcfQrCodeDataUrl.length);
-      } catch {
-        console.warn('Failed to generate QR dataURL for', invoice.invoiceNumber);
-        emcfQrCodeDataUrl = undefined;
-      } finally {
-        setIsGeneratingPdfId(null);
+      let emcfQrCodeDataUrl: string | undefined;
+      if (anyInv.emcfQrCode) {
+        console.log('Facture', invoice.invoiceNumber, 'emcfQrCode present:', anyInv.emcfQrCode);
+        try {
+          emcfQrCodeDataUrl = await qrCodeCache.getDataUrl(String(anyInv.emcfQrCode), { margin: 1, width: 300 });
+          console.log('QR dataURL generated, length:', emcfQrCodeDataUrl.length);
+        } catch {
+          console.warn('Failed to generate QR dataURL for', invoice.invoiceNumber);
+          emcfQrCodeDataUrl = undefined;
+        }
+      } else {
+        console.log('Facture', invoice.invoiceNumber, 'NO emcfQrCode field');
       }
-    } else {
-      console.log('Facture', invoice.invoiceNumber, 'NO emcfQrCode field');
-    }
 
-    const logoDataUrl = await getInvoiceLogoDataUrl();
-    const doc = generateInvoicePDF({
-      invoiceNumber: invoice.invoiceNumber,
-      date: invoice.date,
-      clientName: invoice.clientName,
-      clientAddress: anyInv.clientAddress || '',
-      clientPhone: anyInv.clientPhone || '',
-      clientIFU: anyInv.clientIFU || undefined,
-      aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
-      tvaRate: anyInv.tvaRate || undefined,
-      items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
-      productName: invoice.productName,
-      quantity: invoice.quantity,
-      unitPrice: invoice.unitPrice,
-      totalHT: invoice.totalPrice - invoice.tva,
-      tva: invoice.tva,
-      totalTTC: invoice.totalPrice,
-      logoDataUrl: logoDataUrl || undefined,
-      emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
-      emcfQrCode: anyInv.emcfQrCode,
-      emcfQrCodeDataUrl,
-      emcfDateTime: anyInv.emcfDateTime,
-      emcfCounters: anyInv.emcfCounters,
-      emcfNim: anyInv.emcfNim,
-      operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
-      originalInvoiceReference: anyInv.originalInvoiceReference,
-    });
-  // Open PDF in new tab
-  const url = (doc as unknown as { output: (format: string) => string }).output('bloburl');
-  window.open(url, '_blank');
+      const logoDataUrl = await getInvoiceLogoDataUrl();
+      const doc = generateInvoicePDF({
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date,
+        clientName: invoice.clientName,
+        clientAddress: anyInv.clientAddress || '',
+        clientPhone: anyInv.clientPhone || '',
+        clientIFU: anyInv.clientIFU || undefined,
+        aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
+        tvaRate: anyInv.tvaRate || undefined,
+        items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
+        productName: invoice.productName,
+        quantity: invoice.quantity,
+        unitPrice: invoice.unitPrice,
+        totalHT: invoice.totalPrice - invoice.tva,
+        tva: invoice.tva,
+        totalTTC: invoice.totalPrice,
+        logoDataUrl: logoDataUrl || undefined,
+        emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
+        emcfQrCode: anyInv.emcfQrCode,
+        emcfQrCodeDataUrl,
+        emcfDateTime: anyInv.emcfDateTime,
+        emcfCounters: anyInv.emcfCounters,
+        emcfNim: anyInv.emcfNim,
+        operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
+        originalInvoiceReference: anyInv.originalInvoiceReference,
+      });
+    // Open PDF in new tab
+    const url = (doc as unknown as { output: (format: string) => string }).output('bloburl');
+    window.open(url, '_blank');
+    } finally {
+      setIsGeneratingPdfId(null);
+    }
   };
 
   const handleDownload = async (invoice: Invoice) => {
-    const anyInv = invoice as unknown as Invoice & {
-      items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
-      clientIFU?: string;
-      tvaRate?: number;
-      clientAddress?: string;
-      clientPhone?: string;
-      emcfCodeMECeFDGI?: string;
-      emcfQrCode?: string;
-      emcfDateTime?: string;
-      emcfCounters?: string;
-      emcfNim?: string;
-      createdBy?: string;
-      originalInvoiceReference?: string;
-    };
+    setIsGeneratingPdfId(String(invoice.id));
+    try {
+      const anyInv = invoice as unknown as Invoice & {
+        items?: Array<{ description: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }>;
+        clientIFU?: string;
+        tvaRate?: number;
+        clientAddress?: string;
+        clientPhone?: string;
+        emcfCodeMECeFDGI?: string;
+        emcfQrCode?: string;
+        emcfDateTime?: string;
+        emcfCounters?: string;
+        emcfNim?: string;
+        createdBy?: string;
+        originalInvoiceReference?: string;
+      };
 
-    let emcfQrCodeDataUrl: string | undefined;
-    if (anyInv.emcfQrCode) {
-      try {
-        setIsGeneratingPdfId(String(invoice.id));
-        emcfQrCodeDataUrl = await qrCodeCache.getDataUrl(String(anyInv.emcfQrCode), { margin: 1, width: 300 });
-      } catch {
-        emcfQrCodeDataUrl = undefined;
-      } finally {
-        setIsGeneratingPdfId(null);
+      let emcfQrCodeDataUrl: string | undefined;
+      if (anyInv.emcfQrCode) {
+        try {
+          emcfQrCodeDataUrl = await qrCodeCache.getDataUrl(String(anyInv.emcfQrCode), { margin: 1, width: 300 });
+        } catch {
+          emcfQrCodeDataUrl = undefined;
+        }
       }
-    }
 
-    const logoDataUrl = await getInvoiceLogoDataUrl();
-    const doc = generateInvoicePDF({
-      invoiceNumber: invoice.invoiceNumber,
-      date: invoice.date,
-      clientName: invoice.clientName,
-      clientAddress: anyInv.clientAddress || '',
-      clientPhone: anyInv.clientPhone || '',
-      clientIFU: anyInv.clientIFU || undefined,
-      aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
-      tvaRate: anyInv.tvaRate || undefined,
-      items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
-      productName: invoice.productName,
-      quantity: invoice.quantity,
-      unitPrice: invoice.unitPrice,
-      totalHT: invoice.totalPrice - invoice.tva,
-      tva: invoice.tva,
-      totalTTC: invoice.totalPrice,
-      logoDataUrl: logoDataUrl || undefined,
-      emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
-      emcfQrCode: anyInv.emcfQrCode,
-      emcfQrCodeDataUrl,
-      emcfDateTime: anyInv.emcfDateTime,
-      emcfCounters: anyInv.emcfCounters,
-      emcfNim: anyInv.emcfNim,
-      operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
-      originalInvoiceReference: anyInv.originalInvoiceReference,
-    });
-    downloadInvoice(invoice.invoiceNumber, doc);
+      const logoDataUrl = await getInvoiceLogoDataUrl();
+      const doc = generateInvoicePDF({
+        invoiceNumber: invoice.invoiceNumber,
+        date: invoice.date,
+        clientName: invoice.clientName,
+        clientAddress: anyInv.clientAddress || '',
+        clientPhone: anyInv.clientPhone || '',
+        clientIFU: anyInv.clientIFU || undefined,
+        aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
+        tvaRate: anyInv.tvaRate || undefined,
+        items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
+        productName: invoice.productName,
+        quantity: invoice.quantity,
+        unitPrice: invoice.unitPrice,
+        totalHT: invoice.totalPrice - invoice.tva,
+        tva: invoice.tva,
+        totalTTC: invoice.totalPrice,
+        logoDataUrl: logoDataUrl || undefined,
+        emcfCodeMECeFDGI: anyInv.emcfCodeMECeFDGI,
+        emcfQrCode: anyInv.emcfQrCode,
+        emcfQrCodeDataUrl,
+        emcfDateTime: anyInv.emcfDateTime,
+        emcfCounters: anyInv.emcfCounters,
+        emcfNim: anyInv.emcfNim,
+        operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
+        originalInvoiceReference: anyInv.originalInvoiceReference,
+      });
+      downloadInvoice(invoice.invoiceNumber, doc);
+    } finally {
+      setIsGeneratingPdfId(null);
+    }
   };
 
   const openDetails = (invoice: Invoice) => {
