@@ -50,47 +50,6 @@ const Products = () => {
     return 18;
   };
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    void loadProducts();
-
-    try {
-      const isElectron = typeof window !== 'undefined' && !!(window as unknown as Window).electronAPI?.db;
-      if (isElectron) {
-        const has = typeof (window as unknown as Window).electronAPI?.db?.resetProductCatalog === 'function';
-        setElectronResetAvailable(has);
-      } else {
-        setElectronResetAvailable(true);
-      }
-    } catch {
-      setElectronResetAvailable(true);
-    }
-    (async () => {
-      try {
-        const cats = await db.getCategories();
-        const typed = cats as Array<{ id: string; name: string }> | undefined;
-        setCategories((typed || []).map(c => ({ id: c.id, name: c.name })));
-      } catch (err) {
-        logger.error('Failed to load categories', err);
-        setCategories([]);
-      }
-    })();
-    const handler = (ev: Event) => {
-      try {
-        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
-        if (!detail) return;
-        if (detail.entity === 'products' || detail.entity === 'categories' || detail.entity === 'stock_movements') void loadProducts();
-      } catch (e) {
-        // ignore
-      }
-    };
-    window.addEventListener('vinchef:data-changed', handler as EventListener);
-    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
-  }, [user, navigate, loadProducts]);
-
   const loadProducts = useCallback(async () => {
     try {
       setLoadError(null);
@@ -132,6 +91,47 @@ const Products = () => {
       toast({ title: 'Erreur', description: "Impossible de charger les produits", variant: 'destructive' });
     }
   }, [toast]);
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    void loadProducts();
+
+    try {
+      const isElectron = typeof window !== 'undefined' && !!(window as unknown as Window).electronAPI?.db;
+      if (isElectron) {
+        const has = typeof (window as unknown as Window).electronAPI?.db?.resetProductCatalog === 'function';
+        setElectronResetAvailable(has);
+      } else {
+        setElectronResetAvailable(true);
+      }
+    } catch {
+      setElectronResetAvailable(true);
+    }
+    (async () => {
+      try {
+        const cats = await db.getCategories();
+        const typed = cats as Array<{ id: string; name: string }> | undefined;
+        setCategories((typed || []).map(c => ({ id: c.id, name: c.name })));
+      } catch (err) {
+        logger.error('Failed to load categories', err);
+        setCategories([]);
+      }
+    })();
+    const handler = (ev: Event) => {
+      try {
+        const detail = (ev as CustomEvent).detail as { entity: string } | undefined;
+        if (!detail) return;
+        if (detail.entity === 'products' || detail.entity === 'categories' || detail.entity === 'stock_movements') void loadProducts();
+      } catch (e) {
+        // ignore
+      }
+    };
+    window.addEventListener('vinchef:data-changed', handler as EventListener);
+    return () => window.removeEventListener('vinchef:data-changed', handler as EventListener);
+  }, [user, navigate, loadProducts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

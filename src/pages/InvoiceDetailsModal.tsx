@@ -46,9 +46,10 @@ export default function InvoiceDetailsModal({ open, onOpenChange, invoice, onPre
     emcfNim?: string;
   };
 
-  const items = invoice.items && invoice.items.length > 0
-    ? invoice.items
-    : [{ description: invoice.productName, quantity: invoice.quantity, unitPrice: invoice.unitPrice }];
+  const items: Array<{ description?: string; name?: string; quantity: number; unitPrice: number; discount?: number; taxGroup?: string; specificTax?: number }> =
+    invoice.items && invoice.items.length > 0
+      ? invoice.items
+      : [{ description: invoice.productName, quantity: invoice.quantity, unitPrice: invoice.unitPrice }];
 
   const invoiceDate = format(new Date(invoice.date), 'dd/MM/yyyy', { locale: fr });
 
@@ -102,7 +103,8 @@ export default function InvoiceDetailsModal({ open, onOpenChange, invoice, onPre
                   const desc = it.description || it.name || '-';
                   const total = (it.unitPrice || 0) * (it.quantity || 0) - (it.discount || 0);
                   const tg = it.taxGroup ? String(it.taxGroup).toUpperCase() : '';
-                  const tgLabel = tg === 'A' || tg === 'E' ? 'EXO' : (tg || '—');
+                  // Libellés officiels DGI e-MECeF (lettre + étiquette, comme SYGMEF)
+                  const tgLabel = ({ A: 'A-EXO', B: 'B-TAX', C: 'C-EXP', D: 'D-MP', E: 'E-TPS', F: 'F-RES' } as Record<string, string>)[tg] || tg || '—';
                   const st = (it.specificTax !== undefined && it.specificTax !== null) ? Number(it.specificTax) : 0;
                   return (
                     <TableRow key={idx}>

@@ -142,6 +142,12 @@ const Invoices = () => {
         console.log('Facture', invoice.invoiceNumber, 'NO emcfQrCode field');
       }
 
+      // AIB : totalPrice = HT + TVA + AIB. On reconstruit le montant AIB depuis le taux
+      // pour l'afficher séparément dans les totaux (exigence DGI : montants identiques à SYGMEF).
+      const aibRateNum = typeof invoice.aibRate === 'number' ? invoice.aibRate : 0;
+      const htPlusAib = invoice.totalPrice - invoice.tva;
+      const aibAmount = aibRateNum > 0 ? Math.round((htPlusAib * aibRateNum) / (100 + aibRateNum)) : 0;
+
       const logoDataUrl = await getInvoiceLogoDataUrl();
       const doc = generateInvoicePDF({
         invoiceNumber: invoice.invoiceNumber,
@@ -150,13 +156,15 @@ const Invoices = () => {
         clientAddress: anyInv.clientAddress || '',
         clientPhone: anyInv.clientPhone || '',
         clientIFU: anyInv.clientIFU || undefined,
+        invoiceType: invoice.invoiceType,
         aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
+        aibAmount,
         tvaRate: anyInv.tvaRate || undefined,
         items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
         productName: invoice.productName,
         quantity: invoice.quantity,
         unitPrice: invoice.unitPrice,
-        totalHT: invoice.totalPrice - invoice.tva,
+        totalHT: htPlusAib - aibAmount,
         tva: invoice.tva,
         totalTTC: invoice.totalPrice,
         logoDataUrl: logoDataUrl || undefined,
@@ -167,6 +175,7 @@ const Invoices = () => {
         emcfCounters: anyInv.emcfCounters,
         emcfNim: anyInv.emcfNim,
         operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
+        operatorCode: anyInv.createdBy || undefined,
         originalInvoiceReference: anyInv.originalInvoiceReference,
       });
     // Open PDF in new tab
@@ -204,6 +213,12 @@ const Invoices = () => {
         }
       }
 
+      // AIB : totalPrice = HT + TVA + AIB. On reconstruit le montant AIB depuis le taux
+      // pour l'afficher séparément dans les totaux (exigence DGI : montants identiques à SYGMEF).
+      const aibRateNum = typeof invoice.aibRate === 'number' ? invoice.aibRate : 0;
+      const htPlusAib = invoice.totalPrice - invoice.tva;
+      const aibAmount = aibRateNum > 0 ? Math.round((htPlusAib * aibRateNum) / (100 + aibRateNum)) : 0;
+
       const logoDataUrl = await getInvoiceLogoDataUrl();
       const doc = generateInvoicePDF({
         invoiceNumber: invoice.invoiceNumber,
@@ -212,13 +227,15 @@ const Invoices = () => {
         clientAddress: anyInv.clientAddress || '',
         clientPhone: anyInv.clientPhone || '',
         clientIFU: anyInv.clientIFU || undefined,
+        invoiceType: invoice.invoiceType,
         aibRate: typeof invoice.aibRate === 'number' ? invoice.aibRate : undefined,
+        aibAmount,
         tvaRate: anyInv.tvaRate || undefined,
         items: anyInv.items && anyInv.items.length > 0 ? anyInv.items : undefined,
         productName: invoice.productName,
         quantity: invoice.quantity,
         unitPrice: invoice.unitPrice,
-        totalHT: invoice.totalPrice - invoice.tva,
+        totalHT: htPlusAib - aibAmount,
         tva: invoice.tva,
         totalTTC: invoice.totalPrice,
         logoDataUrl: logoDataUrl || undefined,
@@ -229,6 +246,7 @@ const Invoices = () => {
         emcfCounters: anyInv.emcfCounters,
         emcfNim: anyInv.emcfNim,
         operatorName: users.find(u => u.id === anyInv.createdBy)?.username || anyInv.createdBy || '',
+        operatorCode: anyInv.createdBy || undefined,
         originalInvoiceReference: anyInv.originalInvoiceReference,
       });
       downloadInvoice(invoice.invoiceNumber, doc);

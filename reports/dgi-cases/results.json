@@ -1,0 +1,1308 @@
+{
+  "generatedAt": "2026-07-15T23:09:15.792Z",
+  "baseUrl": "https://developper.impots.bj/sygmef-emcf",
+  "vendorIfu": "0202368226611",
+  "cases": {
+    "1": {
+      "id": 1,
+      "label": "FV exonéré",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 1,
+            "taxGroup": "A"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "5a94c543-9773-4c48-8b16-cb106c19e297",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 1000,
+        "tab": 0,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 1000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:04",
+        "qrCode": "F;TS01017752;TESTWZK2KC5GC5YWHB23KB7G;0202368226611;20260716000704",
+        "codeMECeFDGI": "TEST-WZK2-KC5G-C5YW-HB23-KB7G",
+        "counters": "133/138 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:07:08.423Z"
+    },
+    "2": {
+      "id": 2,
+      "label": "FV taxable",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 1,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "e440c51c-c7d2-4301-9ef3-2c8246082ea8",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 2000,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 1695,
+        "had": 0,
+        "vab": 305,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 2000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:54",
+        "qrCode": "F;TS01017752;TESTTEIK7TAQGSHALSXLQSSL;0202368226611;20260716000754",
+        "codeMECeFDGI": "TEST-TEIK-7TAQ-GSHA-LSXL-QSSL",
+        "counters": "134/139 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:07:58.926Z"
+    },
+    "3": {
+      "id": 3,
+      "label": "FV taxable+exonéré",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "d48d6c26-e3b5-442e-92d0-39e3ed802370",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 6000,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5085,
+        "had": 0,
+        "vab": 915,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 8000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:55",
+        "qrCode": "F;TS01017752;TESTIXPS7Q7HETB4X7K2TU37;0202368226611;20260716000755",
+        "codeMECeFDGI": "TEST-IXPS-7Q7H-ETB4-X7K2-TU37",
+        "counters": "135/140 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:07:59.833Z"
+    },
+    "4": {
+      "id": 4,
+      "label": "FV quantités décimales",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2.5,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3.25,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "c4d404f7-1b81-4b47-9342-bb89edf36e56",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2500,
+        "tab": 6500,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5508,
+        "had": 0,
+        "vab": 992,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 9000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:56",
+        "qrCode": "F;TS01017752;TESTOMHYU233J3EQO334KM3K;0202368226611;20260716000756",
+        "codeMECeFDGI": "TEST-OMHY-U233-J3EQ-O334-KM3K",
+        "counters": "136/141 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:00.654Z"
+    },
+    "5": {
+      "id": 5,
+      "label": "FV avec IFU+nom client",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "customer": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "1435aa69-629d-4c37-a82b-d5d944070ab7",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 6000,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5085,
+        "had": 0,
+        "vab": 915,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 8000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:57",
+        "qrCode": "F;TS01017752;TESTOQ5NJLB54A6TPCMLUBT4;0202368226611;20260716000757",
+        "codeMECeFDGI": "TEST-OQ5N-JLB5-4A6T-PCML-UBT4",
+        "counters": "137/142 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:01.367Z"
+    },
+    "6": {
+      "id": 6,
+      "label": "FA remboursement (réf. test 5)",
+      "type": "FA",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FA",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "customer": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        },
+        "reference": "TESTOQ5NJLB54A6TPCMLUBT4"
+      },
+      "submit": {
+        "uid": "122454fc-97cb-4114-800e-f0ed765b4fe7",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 6000,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5085,
+        "had": 0,
+        "vab": 915,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 8000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:54",
+        "qrCode": "F;TS01017752;TEST3P23UA54FOLK4LKNECXS;0202368226611;20260716000854",
+        "codeMECeFDGI": "TEST-3P23-UA54-FOLK-4LKN-ECXS",
+        "counters": "4/155 FA",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:58.301Z"
+    },
+    "7": {
+      "id": 7,
+      "label": "FV taxable + taxe spécifique",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B",
+            "taxSpecific": 500
+          }
+        ],
+        "client": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "customer": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "9fa930ec-59ab-4d26-a7f3-39b75766cb56",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 6590,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5585,
+        "had": 0,
+        "vab": 1005,
+        "vad": 0,
+        "aib": 0,
+        "ts": 500,
+        "total": 6590
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:58",
+        "qrCode": "F;TS01017752;TESTQZXFFIMPNGSGGRF3YG3L;0202368226611;20260716000758",
+        "codeMECeFDGI": "TEST-QZXF-FIMP-NGSG-GRF3-YG3L",
+        "counters": "138/143 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:02.493Z"
+    },
+    "8": {
+      "id": 8,
+      "label": "FV AIB 5%",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        },
+        "aib": "B"
+      },
+      "submit": {
+        "uid": "a4452c6f-9440-45a3-b4d7-a0db2c9188f4",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 6000,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5085,
+        "had": 0,
+        "vab": 915,
+        "vad": 0,
+        "aib": 354,
+        "ts": 0,
+        "total": 8354
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:59",
+        "qrCode": "F;TS01017752;TESTKEMPWRKOGUOHY6HD6DPH;0202368226611;20260716000759",
+        "codeMECeFDGI": "TEST-KEMP-WRKO-GUOH-Y6HD-6DPH",
+        "counters": "139/144 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:03.324Z"
+    },
+    "9": {
+      "id": 9,
+      "label": "FV AIB 1% + IFU client",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B"
+          }
+        ],
+        "client": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "customer": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        },
+        "aib": "A"
+      },
+      "submit": {
+        "uid": "64b06a11-4a9c-4475-a8af-01b6b344b08d",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 6000,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5085,
+        "had": 0,
+        "vab": 915,
+        "vad": 0,
+        "aib": 71,
+        "ts": 0,
+        "total": 8071
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:07:59",
+        "qrCode": "F;TS01017752;TESTTVR34GUR2IFPAUR3FYTR;0202368226611;20260716000759",
+        "codeMECeFDGI": "TEST-TVR3-4GUR-2IFP-AUR3-FYTR",
+        "counters": "140/145 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:04.042Z"
+    },
+    "10": {
+      "id": 10,
+      "label": "FV AIB 5% + IFU + taxe spécifique",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 3,
+            "taxGroup": "B",
+            "taxSpecific": 500
+          }
+        ],
+        "client": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "customer": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        },
+        "aib": "B"
+      },
+      "submit": {
+        "uid": "164f3717-c628-47e7-bbdd-eaa0b23af99e",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 6590,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 5585,
+        "had": 0,
+        "vab": 1005,
+        "vad": 0,
+        "aib": 379,
+        "ts": 500,
+        "total": 8969
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:00",
+        "qrCode": "F;TS01017752;TESTPXP4TW72CQJSW2VP7ICF;0202368226611;20260716000800",
+        "codeMECeFDGI": "TEST-PXP4-TW72-CQJS-W2VP-7ICF",
+        "counters": "141/146 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:04.850Z"
+    },
+    "11": {
+      "id": 11,
+      "label": "FV IFU client + taxe de séjour",
+      "type": "FV",
+      "sejour": true,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Vin rouge Bordeaux 75cl",
+            "price": 2000,
+            "quantity": 2,
+            "taxGroup": "B",
+            "taxSpecific": 1000
+          }
+        ],
+        "client": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "customer": {
+          "name": "Hôtel Royal Palace SARL",
+          "ifu": "0202368226611",
+          "address": "Porto-Novo, Bénin",
+          "contact": "+22997000002"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "f705cbe3-2ae9-4158-b12d-221890792d16",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 5180,
+        "tac": 0,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 4390,
+        "had": 0,
+        "vab": 790,
+        "vad": 0,
+        "aib": 0,
+        "ts": 1000,
+        "total": 5180
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:01",
+        "qrCode": "F;TS01017752;TEST6B57LBA42I65VHRWWLYA;0202368226611;20260716000801",
+        "codeMECeFDGI": "TEST-6B57-LBA4-2I65-VHRW-WLYA",
+        "counters": "142/147 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:05.774Z"
+    },
+    "12": {
+      "id": 12,
+      "label": "FV régime exception",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Vin mousseux Asti (régime exception)",
+            "price": 2500,
+            "quantity": 2,
+            "taxGroup": "D"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "1cd96d2a-05f8-4321-98cc-a859011aea12",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 0,
+        "tad": 5000,
+        "tae": 0,
+        "taf": 0,
+        "hab": 0,
+        "had": 4237,
+        "vab": 0,
+        "vad": 763,
+        "aib": 0,
+        "ts": 0,
+        "total": 5000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:02",
+        "qrCode": "F;TS01017752;TESTEMA4SWWL7TRM47ROWADG;0202368226611;20260716000802",
+        "codeMECeFDGI": "TEST-EMA4-SWWL-7TRM-47RO-WADG",
+        "counters": "143/148 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:06.555Z"
+    },
+    "13": {
+      "id": 13,
+      "label": "FV régime exception + taxe spécifique",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Vin mousseux Asti (régime exception)",
+            "price": 2500,
+            "quantity": 2,
+            "taxGroup": "D",
+            "taxSpecific": 500
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "d786af2e-ab3e-4b1b-8df9-5c4d2584cfb5",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 0,
+        "tad": 5590,
+        "tae": 0,
+        "taf": 0,
+        "hab": 0,
+        "had": 4737,
+        "vab": 0,
+        "vad": 853,
+        "aib": 0,
+        "ts": 500,
+        "total": 5590
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:03",
+        "qrCode": "F;TS01017752;TESTPEOJVNTPJTX47V5HCRS4;0202368226611;20260716000803",
+        "codeMECeFDGI": "TEST-PEOJ-VNTP-JTX4-7V5H-CRS4",
+        "counters": "144/149 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:07.306Z"
+    },
+    "14": {
+      "id": 14,
+      "label": "FV régime TPS",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Prestation service bureautique",
+            "price": 1500,
+            "quantity": 2,
+            "taxGroup": "E"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "1b1a7519-7871-40c4-a8bd-439f38c92036",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 0,
+        "tad": 0,
+        "tae": 3000,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 3000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:03",
+        "qrCode": "F;TS01017752;TESTLOSG7KFZKI2KY7SUYNXY;0202368226611;20260716000803",
+        "codeMECeFDGI": "TEST-LOSG-7KFZ-KI2K-Y7SU-YNXY",
+        "counters": "145/150 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:08.539Z"
+    },
+    "15": {
+      "id": 15,
+      "label": "FV régime TPS + taxe spécifique",
+      "type": "FV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "FV",
+        "items": [
+          {
+            "name": "Prestation service bureautique",
+            "price": 1500,
+            "quantity": 2,
+            "taxGroup": "E",
+            "taxSpecific": 500
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "c014a738-d716-4a71-83a6-30830cac6023",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 0,
+        "tad": 0,
+        "tae": 3500,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 500,
+        "total": 3500
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:05",
+        "qrCode": "F;TS01017752;TESTYTAU72MWVNW3JHM3VNH5;0202368226611;20260716000805",
+        "codeMECeFDGI": "TEST-YTAU-72MW-VNW3-JHM3-VNH5",
+        "counters": "146/151 FV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:09.120Z"
+    },
+    "16": {
+      "id": 16,
+      "label": "EV export produits taxables",
+      "type": "EV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "EV",
+        "items": [
+          {
+            "name": "Vin blanc Sancerre 75cl (export)",
+            "price": 5000,
+            "quantity": 2,
+            "taxGroup": "C"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "33a0ada4-eb65-4162-ab1e-00283aef6573",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 10000,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 10000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:05",
+        "qrCode": "F;TS01017752;TESTCJHQCS5ISLBNRHTBKGA4;0202368226611;20260716000805",
+        "codeMECeFDGI": "TEST-CJHQ-CS5I-SLBN-RHTB-KGA4",
+        "counters": "1/152 EV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:09.784Z"
+    },
+    "17": {
+      "id": 17,
+      "label": "EV export (exonéré+taxable)",
+      "type": "EV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "EV",
+        "items": [
+          {
+            "name": "Eau minérale Possotomè 1,5L",
+            "price": 1000,
+            "quantity": 2,
+            "taxGroup": "A"
+          },
+          {
+            "name": "Vin blanc Sancerre 75cl (export)",
+            "price": 5000,
+            "quantity": 3,
+            "taxGroup": "C"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "958909b9-9328-4fce-98a7-fad598230cd7",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 2000,
+        "tab": 0,
+        "tac": 15000,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 17000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:06",
+        "qrCode": "F;TS01017752;TESTLBUT64L3K7IQCSPSI464;0202368226611;20260716000806",
+        "codeMECeFDGI": "TEST-LBUT-64L3-K7IQ-CSPS-I464",
+        "counters": "2/153 EV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:10.473Z"
+    },
+    "18": {
+      "id": 18,
+      "label": "EA avoir export (réf. test 16)",
+      "type": "EA",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "EA",
+        "items": [
+          {
+            "name": "Vin blanc Sancerre 75cl (export)",
+            "price": 5000,
+            "quantity": 2,
+            "taxGroup": "C"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        },
+        "reference": "TESTCJHQCS5ISLBNRHTBKGA4"
+      },
+      "submit": {
+        "uid": "68cd7451-1dfe-462d-ad2f-45d10d567d85",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 10000,
+        "tad": 0,
+        "tae": 0,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 10000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:09:14",
+        "qrCode": "F;TS01017752;TESTKI6E4XVBQRIYG4WC7PGY;0202368226611;20260716000914",
+        "codeMECeFDGI": "TEST-KI6E-4XVB-QRIY-G4WC-7PGY",
+        "counters": "1/156 EA",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:09:18.681Z"
+    },
+    "19": {
+      "id": 19,
+      "label": "EV export régime TPS",
+      "type": "EV",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "EV",
+        "items": [
+          {
+            "name": "Prestation service bureautique",
+            "price": 1500,
+            "quantity": 2,
+            "taxGroup": "E"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        }
+      },
+      "submit": {
+        "uid": "eac2e708-83a6-445a-9dae-8401f5fb0f0b",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 0,
+        "tad": 0,
+        "tae": 3000,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 3000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:08:07",
+        "qrCode": "F;TS01017752;TESTX6ZADMHNFWZWFQFCFYTW;0202368226611;20260716000807",
+        "codeMECeFDGI": "TEST-X6ZA-DMHN-FWZW-FQFC-FYTW",
+        "counters": "3/154 EV",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:08:11.402Z"
+    },
+    "20": {
+      "id": 20,
+      "label": "EA avoir export TPS (réf. test 19)",
+      "type": "EA",
+      "sejour": false,
+      "payload": {
+        "ifu": "0202368226611",
+        "type": "EA",
+        "items": [
+          {
+            "name": "Prestation service bureautique",
+            "price": 1500,
+            "quantity": 2,
+            "taxGroup": "E"
+          }
+        ],
+        "client": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "customer": {
+          "name": "Client Divers",
+          "address": "Cotonou, Bénin",
+          "contact": "+22900000000"
+        },
+        "operator": {
+          "id": "1",
+          "name": "admin"
+        },
+        "reference": "TESTX6ZADMHNFWZWFQFCFYTW"
+      },
+      "submit": {
+        "uid": "b7f67fdc-f5c8-4bde-8433-50a6385cc4bb",
+        "ta": 0,
+        "tb": 18,
+        "tc": 0,
+        "td": 18,
+        "taa": 0,
+        "tab": 0,
+        "tac": 0,
+        "tad": 0,
+        "tae": 3000,
+        "taf": 0,
+        "hab": 0,
+        "had": 0,
+        "vab": 0,
+        "vad": 0,
+        "aib": 0,
+        "ts": 0,
+        "total": 3000
+      },
+      "confirm": {
+        "dateTime": "16/07/2026 00:09:15",
+        "qrCode": "F;TS01017752;TESTNNRX7DMZHCRDLYFVMF3Z;0202368226611;20260716000915",
+        "codeMECeFDGI": "TEST-NNRX-7DMZ-HCRD-LYFV-MF3Z",
+        "counters": "2/157 EA",
+        "nim": "TS01017752",
+        "refundWithAibPayment": false
+      },
+      "confirmedAt": "2026-07-15T23:09:19.500Z"
+    }
+  },
+  "status": {
+    "status": true,
+    "version": "1.0",
+    "ifu": "0202368226611",
+    "nim": "TS01017752",
+    "tokenValid": "2026-08-05T18:38:07.523+01:00",
+    "serverDateTime": "2026-07-16T00:09:13.2113394+01:00",
+    "pendingRequestsCount": 0,
+    "pendingRequestsList": []
+  }
+}

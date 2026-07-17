@@ -28,6 +28,7 @@ declare global {
     // Optional helper exposed by preload/main to reset demo data (desktop only)
     resetDemoData?: () => Promise<boolean>;
     resetProductCatalog?: () => Promise<boolean>;
+    resetSalesAndInvoices?: (options?: { role?: string }) => Promise<boolean>;
     // Optional CRUD methods (desktop main may expose these)
     addProduct?: (...args: unknown[]) => Promise<unknown>;
     updateProduct?: (...args: unknown[]) => Promise<void>;

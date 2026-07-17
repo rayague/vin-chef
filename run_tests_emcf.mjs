@@ -838,7 +838,9 @@ async function main() {
           const res = inner?.response;
           const code = res?.errorCode;
           attempts.push({ phase: 'type-detect', type: t, ok: false, error: safeString(inner?.message || inner), api: res || null });
-          if (code === '4' && !selectedType) {
+          // errorCode=4 (référence manquante) et errorCode=5 (référence != 24 caractères)
+          // signifient tous deux que le type de facture est accepté par l'API.
+          if ((code === '4' || code === '5') && !selectedType) {
             selectedType = t;
             // don't break; keep searching for a direct success
           }
@@ -873,6 +875,8 @@ async function main() {
           return s.length === 24 ? s : s;
         };
 
+        // Priorité au code MECeF 24 caractères : c'est la référence attendue par la DGI (errorCode=5 sinon).
+        pushVal('confirm.code24', extract24FromQr(originalConfirm?.qrCode) || normalizeCodeMecEf(originalConfirm?.codeMECeFDGI));
         pushVal('uid', original.uid);
         pushVal('confirm.uid', originalConfirm?.uid);
         pushVal('confirm.nim', originalConfirm?.nim);

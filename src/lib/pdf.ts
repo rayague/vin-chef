@@ -11,7 +11,10 @@ export interface InvoiceData {
   clientAddress?: string;
   clientPhone?: string;
   clientIFU?: string;
+  invoiceType?: 'FV' | 'AV' | 'FV_EXPORT' | 'AV_EXPORT'; // Titre de facture aligné sur SYGMEF
   aibRate?: 0 | 1 | 5;
+  aibAmount?: number; // Montant AIB (FCFA) — affiché dans le bloc des totaux
+  operatorCode?: string; // Code du vendeur/opérateur (exigence DGI: nom et code du vendeur)
   logoDataUrl?: string;
   emcfCodeMECeFDGI?: string;
   emcfQrCode?: string;
@@ -37,21 +40,21 @@ export interface InvoiceData {
 }
 
 // Company info (configurable)
-// Source: IFU 0202368226611, RCCM RB/COT/25 A 110025 du 28-05-2025
-// Enseigne: FIFA SERVICES, Nom commercial: BUSINESS CENTER FIFA
+// Source de vérité : fiche contribuable SYGMEF (vérifiée le 2026-07-16 sur
+// https://developper.impots.bj/sygmef-test/verification) — la DGI exige que
+// l'identité sur la facture soit identique à celle affichée dans SYGMEF.
 const COMPANY_INFO = {
   name: 'BUSINESS CENTER FIFA',
-  // Enseigne (pour affichage alternatif sur certains documents)
-  tradeName: 'FIFA SERVICES',
+  // Promoteur (personne physique) tel qu'affiché dans SYGMEF
+  promoter: 'AGUEMON JUSTINE',
   address: 'Îlot 534, Parcelle C, Maison Godonou Nestor ABEHO, TANTO',
   city: 'Cotonou',
   district: '1ER ARRONDISSEMENT',
   country: 'Bénin',
   phone: '0196807469',
-  email: 'fifameservices01@gmail.com',
+  email: 'businesscenterfifa@gmail.com',
   ifu: '0202368226611',
   nim: '', // À obtenir auprès de la DGI
-  rcs: '', // Registre du Commerce et des Sociétés (non fourni dans les documents)
   rccm: 'RB/COT/25 A 110025', // RCCM du 28-05-2025
   tvaNumber: '0202368226611',
 };
@@ -122,7 +125,7 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.text(COMPANY_INFO.name, companyX, 20);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${COMPANY_INFO.tradeName}`, companyX, 25);
+  doc.text(`(${COMPANY_INFO.promoter})`, companyX, 25);
   doc.text(`${COMPANY_INFO.address}`, companyX, 29);
   const cityLine = COMPANY_INFO.district 
     ? `${COMPANY_INFO.city}, ${COMPANY_INFO.district}` 
@@ -147,13 +150,23 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primary[0], primary[1], primary[2]);
-  if (data.originalInvoiceReference) {
-    doc.text('FACTURE D\'AVOIR', 135, 18);
+  // Titres alignés sur l'affichage SYGMEF (FACTURE / FACTURE A L'EXPORTATION / avoirs)
+  const isAvoirType = data.invoiceType === 'AV' || data.invoiceType === 'AV_EXPORT' || Boolean(data.originalInvoiceReference);
+  const isExportType = data.invoiceType === 'FV_EXPORT' || data.invoiceType === 'AV_EXPORT';
+  const invoiceTitle = isAvoirType
+    ? (isExportType ? "FACTURE D'AVOIR A L'EXPORTATION" : "FACTURE D'AVOIR")
+    : (isExportType ? "FACTURE A L'EXPORTATION" : 'FACTURE');
+  if (invoiceTitle.length > 20) doc.setFontSize(9);
+  if (isAvoirType) {
+    doc.text(invoiceTitle, 135, 18);
     doc.setFontSize(7);
-    doc.text(`Réf. Orig: ${data.originalInvoiceReference}`, 135, 22);
+    if (data.originalInvoiceReference) {
+      doc.text(`Réf. Orig: ${formatMecEfCode(data.originalInvoiceReference) || data.originalInvoiceReference}`, 135, 22);
+    }
   } else {
-    doc.text('FACTURE', 135, 20);
+    doc.text(invoiceTitle, 135, 20);
   }
+  doc.setFontSize(12);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`N°: ${data.invoiceNumber}`, 135, 26);
@@ -255,6 +268,17 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     clientY += 5;
   }
 
+  // Vendeur (nom et code) — exigence DGI: afficher le nom et le code du vendeur sur la facture
+  if (data.operatorName) {
+    const vendorLine = data.operatorCode
+      ? `Vendeur: ${data.operatorName} (Code: ${data.operatorCode})`
+      : `Vendeur: ${data.operatorName}`;
+    doc.setFont('helvetica', 'bold');
+    doc.text(vendorLine, 15, clientY);
+    doc.setFont('helvetica', 'normal');
+    clientY += 5;
+  }
+
   // Table header and rows
   const tableStartY = Math.max(clientY + 6, clientStartY + 26);
 
@@ -266,7 +290,8 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     data.items.forEach(item => {
       const lineTotal = item.unitPrice * item.quantity - (item.discount || 0);
       const tg = item.taxGroup ? String(item.taxGroup).toUpperCase() : '';
-      const LABEL: Record<string, string> = { A: 'EXO', B: 'TAX', C: 'EXP', D: 'MP', E: 'TPS', F: 'RES' };
+      // Groupe affiché avec sa lettre (comme SYGMEF: "(A-EX)", "(B)"…) + étiquette officielle
+      const LABEL: Record<string, string> = { A: 'A-EXO', B: 'B-TAX', C: 'C-EXP', D: 'D-MP', E: 'E-TPS', F: 'F-RES' };
       const tgLabel = tg ? (LABEL[tg] || tg) : '—';
       const st = (item.specificTax !== undefined && item.specificTax !== null) ? Number(item.specificTax) : 0;
       rows.push([
@@ -289,15 +314,19 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     ]);
   }
 
+  // En mode multi-articles (e-MECeF), les prix transmis à la DGI sont TTC :
+  // les colonnes affichent donc P.U. et Montant (TTC), la décomposition HT/TVA/AIB
+  // est faite dans le bloc des totaux (identique à SYGMEF).
+  const isMultiItems = Boolean(data.items && data.items.length > 0);
   autoTable(doc, {
     startY: tableStartY,
     head: [[
       { content: 'Désignation', styles: { halign: 'left' } },
       { content: 'Qté', styles: { halign: 'center' } },
-      { content: 'P.U. HT (FCFA)', styles: { halign: 'right' } },
-      { content: 'Total HT (FCFA)', styles: { halign: 'right' } },
-      { content: (data.items && data.items.length > 0) ? 'Rég.' : 'TVA %', styles: { halign: 'center' } },
-      { content: (data.items && data.items.length > 0) ? 'Taxe spéc.' : 'Montant TVA (FCFA)', styles: { halign: 'right' } },
+      { content: isMultiItems ? 'P.U. (FCFA)' : 'P.U. HT (FCFA)', styles: { halign: 'right' } },
+      { content: isMultiItems ? 'Montant (FCFA)' : 'Total HT (FCFA)', styles: { halign: 'right' } },
+      { content: isMultiItems ? 'Rég.' : 'TVA %', styles: { halign: 'center' } },
+      { content: isMultiItems ? 'Taxe spéc.' : 'Montant TVA (FCFA)', styles: { halign: 'right' } },
     ]],
     body: rows,
     theme: 'grid',
@@ -322,9 +351,11 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   const totalsBoxTop = finalY;
   const totalsLineH = 6;
   const hasDiscount = Boolean(data.discount && data.discount > 0);
+  const aibAmt = Math.max(0, Math.round(data.aibAmount ?? 0));
+  const hasAib = aibAmt > 0;
   const totalsPadTop = 10;
   const totalsPadBottom = 6;
-  const totalsLinesBeforeSeparator = hasDiscount ? 4 : 2; // HT, (remise, HT après remise), TVA
+  const totalsLinesBeforeSeparator = (hasDiscount ? 4 : 2) + (hasAib ? 1 : 0); // HT, (remise, HT après remise), TVA, (AIB)
   const totalsExtraAfterTva = totalsLineH; // corresponds to: y += totalsLineH (before drawing separator)
   const totalsExtraAfterSeparator = totalsLineH + 1; // corresponds to: y += totalsLineH + 1 (after drawing separator)
   const totalsLinesAfterSeparator = 1; // TTC
@@ -368,9 +399,20 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     y += totalsLineH;
   }
 
-  doc.text(`TVA (${tvaRate}%)`, totalsLabelX, y);
+  // Pour une facture multi-articles, la TVA dépend du groupe de taxation de chaque ligne :
+  // ne pas afficher un taux global trompeur (ex: export/exonéré => TVA 0).
+  const tvaLabel = (data.items && data.items.length > 0)
+    ? (data.tva > 0 ? 'TVA' : 'TVA (0%)')
+    : `TVA (${tvaRate}%)`;
+  doc.text(tvaLabel, totalsLabelX, y);
   doc.text(`${formatCurrency(data.tva)} FCFA`, totalsValueX, y, { align: 'right' });
   y += totalsLineH;
+
+  if (hasAib) {
+    doc.text(`AIB (${String(data.aibRate ?? '')}%)`, totalsLabelX, y);
+    doc.text(`${formatCurrency(aibAmt)} FCFA`, totalsValueX, y, { align: 'right' });
+    y += totalsLineH;
+  }
 
   doc.setDrawColor(210, 210, 210);
   doc.setLineWidth(0.2);
@@ -397,9 +439,10 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
       const formatted = formatMecEfCode(data.emcfCodeMECeFDGI);
       if (formatted) {
         doc.setFont('courier', 'bold');
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setTextColor(primary[0], primary[1], primary[2]);
-        const codeLines = doc.splitTextToSize(formatted, qrSize + 15) as string[];
+        // Le code MECeF (29 caractères avec tirets) doit rester lisible sur UNE ligne
+        const codeLines = doc.splitTextToSize(formatted, qrSize + 22) as string[];
         doc.text(codeLines, qrX + qrSize / 2, qrY + qrSize + 5, { align: 'center' });
         doc.setFont('helvetica', 'normal');
       }
@@ -461,7 +504,7 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   const footerTopMargin = 12;
   const minFooterY = Math.max(paymentY + 35, sigY + sigBoxH) + 10;
   let footerY = Math.max(minFooterY, 240);
-  if (footerY + 26 > pageHeight - footerTopMargin) {
+  if (footerY + 30 > pageHeight - footerTopMargin) {
     doc.addPage();
     footerY = 20;
   }
@@ -473,7 +516,11 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   doc.setFont('helvetica', 'normal');
   let legalY = footerY + 4;
   
-  doc.text(`• TVA comprise au taux de ${tvaRate}% conformément à la législation fiscale en vigueur au Bénin.`, 15, legalY);
+  if (data.tva > 0) {
+    doc.text(`• TVA comprise au taux de ${tvaRate}% conformément à la législation fiscale en vigueur au Bénin.`, 15, legalY);
+  } else {
+    doc.text('• Opération non soumise à la TVA (exonération, exportation ou régime TPS) selon le groupe de taxation.', 15, legalY);
+  }
   legalY += 3.5;
   doc.text('• Facture émise conformément au système OHADA (Organisation pour l\'Harmonisation en Afrique du Droit des Affaires).', 15, legalY);
   legalY += 3.5;
@@ -483,16 +530,11 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
   legalY += 3.5;
   doc.text('• Document à conserver pour preuve fiscale et comptable pendant une durée légale de 10 ans.', 15, legalY);
   
-  // Watermark-style footer
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(150, 150, 150);
-  const footerBottomY = Math.min(pageHeight - 5, footerY + 22);
-  doc.text(`Document généré électroniquement le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })} | ${COMPANY_INFO.name}`, 105, footerBottomY, { align: 'center' });
-
-  // Footer sécurité e-MECeF (si disponible)
+  // Footer sécurité e-MECeF (si disponible) — placé APRÈS la dernière mention légale
+  // (les 5 mentions se terminent à footerY + 18) pour éviter tout chevauchement.
+  let footerContentEndY = legalY;
   if (data.emcfCodeMECeFDGI || data.emcfNim || data.emcfDateTime) {
-    const secY = footerY + 18;
+    const secY = legalY + 5;
     doc.setFont('courier', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(120, 120, 120);
@@ -502,9 +544,19 @@ export const generateInvoicePDF = (data: InvoiceData): jsPDF => {
     if (data.emcfNim) parts.push(`NIM: ${String(data.emcfNim)}`);
     if (data.emcfDateTime) parts.push(`Date DGI: ${String(data.emcfDateTime)}`);
     const line = parts.join('  •  ');
-    if (line) doc.text(line, 15, Math.min(secY, footerBottomY - 2));
+    if (line) {
+      doc.text(line, 15, secY);
+      footerContentEndY = secY;
+    }
     doc.setFont('helvetica', 'normal');
   }
+
+  // Watermark-style footer
+  doc.setFontSize(6);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(150, 150, 150);
+  const footerBottomY = Math.min(pageHeight - 5, footerContentEndY + 5);
+  doc.text(`Document généré électroniquement le ${format(new Date(), 'dd/MM/yyyy à HH:mm', { locale: fr })} | ${COMPANY_INFO.name}`, 105, footerBottomY, { align: 'center' });
 
   return doc;
 };

@@ -245,7 +245,7 @@ const Sales = () => {
     let totalDiscount = 0;
     let totalVat = 0;
     const itemsPayload: Array<{ description: string; quantity: number; unitPrice: number; taxGroup: NonNullable<Product['taxGroup']>; specificTax?: number; discount?: number }> = [];
-    const normalizedItems: Array<{ productId: string; quantity: number; specificTax?: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
+    const normalizedItems: Array<{ productId: string; quantity: number; taxGroup: NonNullable<Product['taxGroup']>; specificTax?: number; discount?: number; discountType: 'percentage' | 'fixed' }> = [];
     for (const it of validItems) {
       const prod = products.find(p => p.id === it.productId)!;
       const q = Number.parseFloat(String(it.quantity));
@@ -424,18 +424,19 @@ const Sales = () => {
         };
 
         const invRes = await emcf.submitInvoice(payload);
-        const invAny = invRes as unknown as { uid?: string; total?: number; errorCode?: string; errorDesc?: string };
+        const invAny = invRes as unknown as { uid?: string; total?: number; vab?: number; vad?: number; aib?: number; errorCode?: string; errorDesc?: string };
         if (!invAny.uid) {
           toast({ title: 'Erreur', description: invAny.errorDesc || "Réponse e-MCF invalide", variant: 'destructive' });
           return;
         }
-        if (typeof invAny.total === 'number' && Math.round(invAny.total) !== totalTTCInt) {
-          toast({
-            title: 'Attention',
-            description: `Totaux e-MCF différents (e-MCF=${Math.round(invAny.total).toLocaleString('fr-FR')} / App=${totalTTCInt.toLocaleString('fr-FR')}). Vérifie puis confirme ou annule.`,
-            variant: 'destructive',
-          });
-        }
+
+        // L'API DGI traite les prix des articles comme TTC : elle décompose elle-même
+        // HT/TVA (vab+vad) et calcule l'AIB. On adopte les montants du serveur comme
+        // source de vérité pour que la facture soit identique à SYGMEF.
+        const serverTva = Math.round(Number(invAny.vab ?? 0) + Number(invAny.vad ?? 0));
+        const serverAib = Math.round(Number(invAny.aib ?? 0));
+        const serverTotal = typeof invAny.total === 'number' ? Math.round(invAny.total) : totalTTCInt;
+        const serverHT = serverTotal - serverTva - serverAib;
 
         setEmcfPending({
           uid: invAny.uid,
@@ -447,7 +448,7 @@ const Sales = () => {
           client,
           validItems: normalizedItems,
           itemsPayload,
-          totals: { totalHT: totalHTInt, tva: tvaInt, totalTTC: totalTTCInt, totalDiscount: Math.round(totalDiscount) },
+          totals: { totalHT: serverHT, tva: serverTva, totalTTC: serverTotal, totalDiscount: Math.round(totalDiscount) },
           emcfPayload: payload,
         });
         toast({ title: 'Pré-validation e-MCF', description: 'Vérifiez puis confirmez dans les 2 minutes.' });
@@ -637,7 +638,7 @@ const Sales = () => {
         totalPrice: emcfPending.totals.totalTTC,
         tva: emcfPending.totals.tva,
         ifu: ((emcfPending.client as unknown) as Client & { ifu?: string }).ifu || undefined,
-        tvaRate: 18,
+        tvaRate: emcfPending.totals.tva > 0 ? 18 : 0,
         invoiceType: formData.invoiceType,
         originalInvoiceReference: (formData.invoiceType === 'AV' || formData.invoiceType === 'AV_EXPORT') ? (formData.originalInvoiceReference || undefined) : undefined,
         aibRate: (() => {
@@ -886,7 +887,7 @@ const Sales = () => {
                                       const prod = products.find(p => p.id === it.productId);
                                       const raw = (prod && (prod.taxGroup || ((formData.invoiceType === 'FV_EXPORT' || formData.invoiceType === 'AV_EXPORT') ? 'C' : 'B'))) || '';
                                       const tg = String(raw || '').toUpperCase();
-                                      const label = ({ A: 'EXO', B: 'TAX', C: 'EXP', D: 'MP', E: 'TPS', F: 'RES' } as Record<string, string>)[tg] || tg || '—';
+                                      const label = ({ A: 'A-EXO', B: 'B-TAX', C: 'C-EXP', D: 'D-MP', E: 'E-TPS', F: 'F-RES' } as Record<string, string>)[tg] || tg || '—';
                                       return label;
                                     })()}
                                   </div>

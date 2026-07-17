@@ -588,7 +588,9 @@ app.whenReady().then(() => {
       }
 
       const originalType = payload && payload.type ? String(payload.type) : undefined;
-      const avRef = normalizedPayload && normalizedPayload.originalInvoiceReference ? String(normalizedPayload.originalInvoiceReference) : undefined;
+      const avRef = normalizedPayload && (normalizedPayload.reference || normalizedPayload.originalInvoiceReference)
+        ? String(normalizedPayload.reference || normalizedPayload.originalInvoiceReference)
+        : undefined;
       console.log('[e-MCF] Payload validé:', {
         ...makeSafeLogMeta(normalizedPayload),
         originalType,

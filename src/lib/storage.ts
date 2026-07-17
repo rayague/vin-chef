@@ -63,6 +63,8 @@ export interface Invoice {
   date: string;
   clientName: string;
   clientIFU?: string;
+  clientPhone?: string;
+  clientAddress?: string;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -72,6 +74,17 @@ export interface Invoice {
   createdBy?: string;
   discount?: number; // Montant de la remise appliquée
   discountType?: 'percentage' | 'fixed'; // Type de remise
+
+  // Lignes de la facture (multi-produits) — snapshot au moment de la vente
+  items?: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    taxGroup?: string;
+    specificTax?: number;
+    discount?: number;
+    discountType?: 'percentage' | 'fixed';
+  }>;
 
   invoiceType?: 'FV' | 'AV' | 'FV_EXPORT' | 'AV_EXPORT';
   originalInvoiceReference?: string;

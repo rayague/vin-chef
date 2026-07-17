@@ -260,15 +260,15 @@ const normalizeEmcfPayload = (payload, emcfInfo = {}) => {
   if (appType.includes('AV')) {
     const rawRef = safeTrim(p.originalInvoiceReference) || safeTrim(p.reference) || safeTrim(p.originalInvoiceUid) || '';
 
-    // DGI API requires exactly 24 characters for original invoice reference.
-    // Some deployments validate `reference` or `originalInvoiceUid` as well, so we normalize all three.
+    // DGI API: la référence de la facture originale = code MECeF DGI (24 caractères, sans tirets)
+    // transmis UNIQUEMENT dans le champ `reference`. Envoyer aussi `originalInvoiceUid` fait
+    // échouer l'API avec l'erreur 11 « facture originale introuvable » (vérifié sur TEST le 2026-07-16).
     const cleaned = safeTrim(rawRef)
       .replace(/-/g, '')
       .replace(/[^0-9a-zA-Z]/g, '');
-    const normalizedRef = cleaned || null;
-    normalized.originalInvoiceReference = normalizedRef;
-    normalized.reference = normalizedRef;
-    normalized.originalInvoiceUid = normalizedRef;
+    normalized.reference = cleaned || null;
+    delete normalized.originalInvoiceReference;
+    delete normalized.originalInvoiceUid;
   }
 
   return normalized;
@@ -288,7 +288,7 @@ const makeSafeLogMeta = (normalizedPayload) => {
     type: normalizedPayload?.type,
     nbItems: Array.isArray(normalizedPayload?.items) ? normalizedPayload.items.length : 0,
     aibRate: normalizedPayload?.aibRate,
-    hasAVReference: !!normalizedPayload?.originalInvoiceReference,
+    hasAVReference: !!(normalizedPayload?.reference || normalizedPayload?.originalInvoiceReference),
     itemsHash: hashObject(itemsForHash),
     customerHash: hashObject(customerForHash),
   };
